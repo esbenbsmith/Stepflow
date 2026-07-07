@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+/*
+ * Palette lifted from huslejenaevn.dk's own design tokens (IBM Plex Sans,
+ * --color-primary #44831e, --color-ink #1a1a1a, --color-gray-* / --border)
+ * so Stepflow reads as a natural extension of the source site, not a
+ * generic dashboard theme.
+ */
+:root {
+  --background: #f5f5f5;
+  --foreground: #1a1a1a;
+
+  --surface-1: #ffffff;
+  --text-primary: #1a1a1a;
+  --text-secondary: #454545;
+  --text-muted: #707070;
+  --gridline: #e6e6e6;
+  --baseline: #bfbfbf;
+  --border: #dcdcdc;
+  --series-1: #44831e;
+  --series-2: #b3541e;
+  --accent: #44831e;
+  --accent-dark: #3c5c22;
+  --link: #004d99;
+  --info-bg: #e2f2fb;
+  --info-border: #1b86c3;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-plex-sans);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0d0d0d;
+    --foreground: #ffffff;
+
+    --surface-1: #1a1a1a;
+    --text-primary: #ffffff;
+    --text-secondary: #b5b5b5;
+    --text-muted: #8e8e8e;
+    --gridline: #2c2c2a;
+    --baseline: #454545;
+    --border: rgba(255, 255, 255, 0.14);
+    --series-1: #41ab5d;
+    --series-2: #e0954f;
+    --accent: #58a83f;
+    --accent-dark: #41ab5d;
+    --link: #5b9bd5;
+    --info-bg: #10222c;
+    --info-border: #1b86c3;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), "IBM Plex Sans", Arial, Helvetica, sans-serif;
+}

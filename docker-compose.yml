@@ -1,0 +1,50 @@
+# Isolated stack for Stepflow — its own network and volume, so it doesn't
+# touch whatever else is running on the server.
+#
+# Two ways to expose it on stepflow.fyi:
+#
+# 1) No reverse proxy on the server yet: uncomment the `caddy` service below.
+#    It gets a TLS cert for stepflow.fyi automatically via Let's Encrypt.
+#
+# 2) You already run a reverse proxy (nginx/Traefik/Caddy) for another app:
+#    remove the `caddy` service and `ports` mapping here, and instead attach
+#    the `stepflow` service to that proxy's Docker network, then add a
+#    stepflow.fyi site block there pointing at stepflow:3000.
+
+services:
+  stepflow:
+    build: .
+    container_name: stepflow
+    restart: unless-stopped
+    env_file: .env.local
+    volumes:
+      - stepflow-data:/app/data
+    networks:
+      - stepflow
+    # Uncomment if there's no reverse proxy in front of this service:
+    # ports:
+    #   - "3000:3000"
+
+  # caddy:
+  #   image: caddy:2-alpine
+  #   container_name: stepflow-caddy
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile
+  #     - caddy-data:/data
+  #     - caddy-config:/config
+  #   networks:
+  #     - stepflow
+  #   depends_on:
+  #     - stepflow
+
+networks:
+  stepflow:
+
+volumes:
+  stepflow-data:
+  # caddy-data:
+  # caddy-config:

@@ -1,0 +1,3 @@
+stepflow.fyi {
+	reverse_proxy stepflow:3000
+}
