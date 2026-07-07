@@ -10,7 +10,7 @@ RUN npm ci
 
 FROM deps AS build
 COPY . .
-RUN npm run build
+RUN mkdir -p public && npm run build
 
 FROM base AS runtime
 ENV NODE_ENV=production
