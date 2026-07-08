@@ -1,22 +1,20 @@
 import Link from "next/link";
 import {
-  getDecisiveBoardOptions,
   getExcludedCount,
   getInFavourByMunicipality,
   getInFavourByYear,
   getMunicipalityAverages,
   getMunicipalityOptions,
   getOverall,
+  getStatutoryOptions,
   getSyncMeta,
   getYearOptions,
-  getYearlyAverages,
 } from "@/lib/db";
 import { formatExcludedNote, formatInFavourHeading, getDictionary, type Locale } from "@/lib/i18n";
-import { FiltersBar } from "@/components/FiltersBar";
 import { InFavourChart } from "@/components/InFavourChart";
 import { MunicipalityChart } from "@/components/MunicipalityChart";
 import { StatTile } from "@/components/StatTile";
-import { TrendChart } from "@/components/TrendChart";
+import { StatutoryPicker } from "@/components/StatutoryPicker";
 
 function formatSyncedAt(iso: string | null, t: ReturnType<typeof getDictionary>): string {
   if (!iso) return t.never;
@@ -26,48 +24,36 @@ function formatSyncedAt(iso: string | null, t: ReturnType<typeof getDictionary>)
   });
 }
 
-export async function Dashboard({
+function parseIds(value: string | undefined): string[] {
+  return value ? value.split(",").filter(Boolean) : [];
+}
+
+export async function StatutesPage({
   locale,
   searchParams,
 }: {
   locale: Locale;
-  searchParams: Promise<{ year?: string; municipality?: string; board?: string }>;
+  searchParams: Promise<{ include?: string; exclude?: string; year?: string; municipality?: string }>;
 }) {
   const t = getDictionary(locale);
   const params = await searchParams;
   const filters = {
     year: params.year,
     municipalityCode: params.municipality,
-    decisiveBoard: params.board,
+    includeSectionIds: parseIds(params.include),
+    excludeSectionIds: parseIds(params.exclude),
   };
   const qs = new URLSearchParams(
     Object.entries(params).filter(([, v]) => v) as [string, string][]
   ).toString();
   const otherLocale: Locale = locale === "en" ? "da" : "en";
-  const otherHref = `${otherLocale === "en" ? "/" : "/da"}${qs ? `?${qs}` : ""}`;
+  const otherHref = `${otherLocale === "en" ? "/statutes" : "/statutes/da"}${qs ? `?${qs}` : ""}`;
+  const dashboardHref = locale === "en" ? "/" : "/da";
 
+  const options = getStatutoryOptions();
   const years = getYearOptions();
   const municipalityOptions = getMunicipalityOptions();
-  const decisiveBoardOptions = getDecisiveBoardOptions();
   const syncedAt = getSyncMeta("last_synced_at");
-
-  const LanguageSwitcher = (
-    <Link
-      href={otherHref}
-      className="text-sm text-[var(--link)] underline hover:text-[var(--text-primary)]"
-    >
-      {t.otherLanguageLabel}
-    </Link>
-  );
-
-  const StatutesLink = (
-    <Link
-      href={locale === "en" ? "/statutes" : "/statutes/da"}
-      className="text-sm text-[var(--link)] underline hover:text-[var(--text-primary)]"
-    >
-      {t.statutesNavLink}
-    </Link>
-  );
 
   const UtilityBar = (
     <div className="border-b border-[var(--border)] bg-[var(--surface-1)]">
@@ -77,43 +63,18 @@ export async function Dashboard({
     </div>
   );
 
-  if (years.length === 0) {
-    return (
-      <>
-        {UtilityBar}
-        <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-16">
-          <div className="mb-4 flex items-center justify-between">
-            <h1 className="text-3xl font-bold text-[var(--text-primary)]">
-              {t.title}
-            </h1>
-            {LanguageSwitcher}
-          </div>
-          <p className="text-[var(--text-secondary)]">
-            {t.noDataPrefix} <code className="text-[var(--text-primary)]">npm run sync</code>{" "}
-            {t.noDataSuffix}
-          </p>
-        </main>
-      </>
-    );
-  }
-
   const overall = getOverall(filters);
   const municipalities = getMunicipalityAverages(filters);
   const excludedCount = getExcludedCount(filters);
 
-  const trendFilters = { decisiveBoard: filters.decisiveBoard };
-  const nationalTrend = getYearlyAverages(trendFilters);
   const selectedMunicipality = filters.municipalityCode
     ? municipalityOptions.find((m) => m.municipalityCode === filters.municipalityCode) ?? null
     : null;
-  const municipalityTrend = filters.municipalityCode
-    ? getYearlyAverages({ ...trendFilters, municipalityCode: filters.municipalityCode })
-    : null;
-
   const inFavourByMunicipality = getInFavourByMunicipality(filters);
   const inFavourByYear = getInFavourByYear({
     municipalityCode: filters.municipalityCode,
-    decisiveBoard: filters.decisiveBoard,
+    includeSectionIds: filters.includeSectionIds,
+    excludeSectionIds: filters.excludeSectionIds,
   });
   const inFavourHeading = formatInFavourHeading(t, {
     year: filters.year,
@@ -124,27 +85,32 @@ export async function Dashboard({
     <>
       {UtilityBar}
       <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-12">
-        <header className="mb-8 flex items-start justify-between border-b border-[var(--border)] pb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-[var(--text-primary)]">
-              {t.title}
-            </h1>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              {t.subtitle}
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            {StatutesLink}
-            {LanguageSwitcher}
+        <header className="mb-8 border-b border-[var(--border)] pb-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <Link
+                href={dashboardHref}
+                className="text-sm text-[var(--link)] underline hover:text-[var(--text-primary)]"
+              >
+                {t.backToDashboard}
+              </Link>
+              <h1 className="mt-2 text-3xl font-bold text-[var(--text-primary)]">
+                {t.statutesPageTitle}
+              </h1>
+              <p className="mt-1 text-sm text-[var(--text-secondary)]">{t.statutesPageSubtitle}</p>
+            </div>
+            <Link
+              href={otherHref}
+              className="text-sm text-[var(--link)] underline hover:text-[var(--text-primary)]"
+            >
+              {t.otherLanguageLabel}
+            </Link>
           </div>
         </header>
 
-        <FiltersBar
-          years={years}
-          municipalities={municipalityOptions}
-          decisiveBoards={decisiveBoardOptions}
-          t={t}
-        />
+        <div className="mb-8">
+          <StatutoryPicker options={options} t={t} />
+        </div>
 
         <div className="mb-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <StatTile
@@ -160,17 +126,6 @@ export async function Dashboard({
             value={overall.municipalityCount.toString()}
           />
         </div>
-
-        {nationalTrend.length > 0 && (
-          <div className="mb-8">
-            <TrendChart
-              national={nationalTrend}
-              municipality={municipalityTrend}
-              municipalityName={selectedMunicipality?.municipalityName ?? null}
-              t={t}
-            />
-          </div>
-        )}
 
         {municipalities.length === 0 ? (
           <p className="text-sm text-[var(--text-secondary)]">{t.noMatch}</p>

@@ -17,7 +17,8 @@ export function getDb(): Database.Database {
       municipality_name TEXT NOT NULL,
       date_of_filing TEXT NOT NULL,
       date_of_decision TEXT NOT NULL,
-      decisive_board TEXT NOT NULL DEFAULT ''
+      decisive_board TEXT NOT NULL DEFAULT '',
+      in_favour TEXT NOT NULL DEFAULT ''
     );
     CREATE INDEX IF NOT EXISTS idx_decisions_municipality ON decisions (municipality_code);
     CREATE INDEX IF NOT EXISTS idx_decisions_decision_year ON decisions (date_of_decision);
@@ -26,12 +27,30 @@ export function getDb(): Database.Database {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    -- A decision can cite multiple statutes, so this is a child table rather
+    -- than a flat column on decisions. Rebuilt from scratch on every sync
+    -- (see scripts/sync.ts), so it always mirrors the API's current state.
+    CREATE TABLE IF NOT EXISTS decision_statutories (
+      decision_id TEXT NOT NULL,
+      law_id TEXT NOT NULL,
+      law_text TEXT NOT NULL,
+      chapter_id TEXT NOT NULL DEFAULT '',
+      chapter_text TEXT NOT NULL DEFAULT '',
+      section_id TEXT NOT NULL DEFAULT '',
+      section_text TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_decision_statutories_decision ON decision_statutories (decision_id);
+    CREATE INDEX IF NOT EXISTS idx_decision_statutories_section ON decision_statutories (section_id);
   `);
 
-  // Migration for DBs created before decisive_board existed.
+  // Migration for DBs created before decisive_board/in_favour existed.
   const columns = db.prepare("PRAGMA table_info(decisions)").all() as { name: string }[];
   if (!columns.some((c) => c.name === "decisive_board")) {
     db.exec("ALTER TABLE decisions ADD COLUMN decisive_board TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columns.some((c) => c.name === "in_favour")) {
+    db.exec("ALTER TABLE decisions ADD COLUMN in_favour TEXT NOT NULL DEFAULT ''");
   }
 
   return db;
@@ -41,6 +60,8 @@ export type Filters = {
   year?: string;
   municipalityCode?: string;
   decisiveBoard?: string;
+  includeSectionIds?: string[];
+  excludeSectionIds?: string[];
 };
 
 // A handful of decisions carry a dateOfFiling that postdates dateOfDecision —
@@ -49,6 +70,16 @@ export type Filters = {
 // decided before it's filed, so these are excluded from averages rather than
 // silently skewing them (see getExcludedCount for a visible tally).
 const VALID_DURATION = "julianday(date_of_decision) >= julianday(date_of_filing)";
+
+function sectionIdPlaceholders(prefix: string, ids: string[], params: Record<string, string>): string {
+  return ids
+    .map((id, i) => {
+      const key = `${prefix}${i}`;
+      params[key] = id;
+      return `@${key}`;
+    })
+    .join(", ");
+}
 
 function userConditions(filters: Filters): { conditions: string[]; params: Record<string, string> } {
   const conditions: string[] = [];
@@ -65,6 +96,18 @@ function userConditions(filters: Filters): { conditions: string[]; params: Recor
   if (filters.decisiveBoard) {
     conditions.push("decisive_board = @decisiveBoard");
     params.decisiveBoard = filters.decisiveBoard;
+  }
+  if (filters.includeSectionIds && filters.includeSectionIds.length > 0) {
+    const placeholders = sectionIdPlaceholders("include", filters.includeSectionIds, params);
+    conditions.push(
+      `id IN (SELECT decision_id FROM decision_statutories WHERE section_id IN (${placeholders}))`
+    );
+  }
+  if (filters.excludeSectionIds && filters.excludeSectionIds.length > 0) {
+    const placeholders = sectionIdPlaceholders("exclude", filters.excludeSectionIds, params);
+    conditions.push(
+      `id NOT IN (SELECT decision_id FROM decision_statutories WHERE section_id IN (${placeholders}))`
+    );
   }
 
   return { conditions, params };
@@ -127,6 +170,66 @@ export function getYearlyAverages(filters: Omit<Filters, "year"> = {}): YearlyAv
       `
     )
     .all(params) as YearlyAverage[];
+  return rows;
+}
+
+export type InFavourCounts = {
+  tenant: number;
+  landlord: number;
+  shared: number;
+  notSet: number;
+  total: number;
+};
+
+const IN_FAVOUR_COUNTS_SELECT = `
+  SUM(CASE WHEN in_favour = 'TENANT' THEN 1 ELSE 0 END) AS tenant,
+  SUM(CASE WHEN in_favour = 'LANDLORD' THEN 1 ELSE 0 END) AS landlord,
+  SUM(CASE WHEN in_favour = 'SHARED' THEN 1 ELSE 0 END) AS shared,
+  SUM(CASE WHEN in_favour NOT IN ('TENANT', 'LANDLORD', 'SHARED') THEN 1 ELSE 0 END) AS notSet,
+  COUNT(*) AS total
+`;
+
+export type InFavourByMunicipality = InFavourCounts & {
+  municipalityCode: string;
+  municipalityName: string;
+};
+
+export function getInFavourByMunicipality(filters: Filters = {}): InFavourByMunicipality[] {
+  const { sql, params } = whereClause(filters);
+  const rows = getDb()
+    .prepare(
+      `
+      SELECT
+        municipality_code AS municipalityCode,
+        municipality_name AS municipalityName,
+        ${IN_FAVOUR_COUNTS_SELECT}
+      FROM decisions
+      ${sql}
+      GROUP BY municipality_code
+      ORDER BY total DESC
+      `
+    )
+    .all(params) as InFavourByMunicipality[];
+  return rows;
+}
+
+export type InFavourByYear = InFavourCounts & { year: string };
+
+export function getInFavourByYear(filters: Omit<Filters, "year"> = {}): InFavourByYear[] {
+  const { sql, params } = whereClause(filters);
+  const rows = getDb()
+    .prepare(
+      `
+      SELECT
+        strftime('%Y', date_of_decision) AS year,
+        ${IN_FAVOUR_COUNTS_SELECT}
+      FROM decisions
+      ${sql}
+      GROUP BY year
+      ORDER BY year ASC
+      `
+    )
+    .all(params) as InFavourByYear[];
   return rows;
 }
 
@@ -205,6 +308,35 @@ export function getExcludedCount(filters: Filters = {}): number {
     .prepare(`SELECT COUNT(*) AS n FROM decisions ${sql}`)
     .get(params) as { n: number };
   return row.n;
+}
+
+export type StatutoryOption = {
+  sectionId: string;
+  lawText: string;
+  chapterText: string;
+  sectionText: string;
+  caseCount: number;
+};
+
+// Only statutes actually cited by at least one synced decision show up here —
+// there's no point offering a filter option with zero matching cases.
+export function getStatutoryOptions(): StatutoryOption[] {
+  return getDb()
+    .prepare(
+      `
+      SELECT
+        section_id AS sectionId,
+        law_text AS lawText,
+        chapter_text AS chapterText,
+        section_text AS sectionText,
+        COUNT(DISTINCT decision_id) AS caseCount
+      FROM decision_statutories
+      WHERE section_id != ''
+      GROUP BY section_id
+      ORDER BY law_text ASC, chapter_text ASC, section_text ASC
+      `
+    )
+    .all() as StatutoryOption[];
 }
 
 export function getSyncMeta(key: string): string | null {

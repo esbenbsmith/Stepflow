@@ -19,6 +19,8 @@
   --border: #dcdcdc;
   --series-1: #44831e;
   --series-2: #b3541e;
+  --series-3: #5a5ea6;
+  --series-4: #bfbfbf;
   --accent: #44831e;
   --accent-dark: #3c5c22;
   --link: #004d99;
@@ -46,6 +48,8 @@
     --border: rgba(255, 255, 255, 0.14);
     --series-1: #41ab5d;
     --series-2: #e0954f;
+    --series-3: #8f93d6;
+    --series-4: #454545;
     --accent: #58a83f;
     --accent-dark: #41ab5d;
     --link: #5b9bd5;

@@ -29,6 +29,17 @@ export interface Dictionary {
   trendHeading: string;
   trendYearAxis: string;
   trendNationalLabel: string;
+  inFavourHeadingAll: string;
+  inFavourHeadingYear: string;
+  inFavourHeadingMunicipality: string;
+  inFavourHeadingBoth: string;
+  inFavourViewMunicipality: string;
+  inFavourViewYear: string;
+  inFavourTenant: string;
+  inFavourLandlord: string;
+  inFavourShared: string;
+  inFavourNotSet: string;
+  percentAxis: string;
   noDataPrefix: string;
   noDataSuffix: string;
   noMatch: string;
@@ -39,6 +50,16 @@ export interface Dictionary {
   excludedNoteOther: string;
   otherLanguageLabel: string;
   attribution: string;
+  statutesNavLink: string;
+  backToDashboard: string;
+  statutesPageTitle: string;
+  statutesPageSubtitle: string;
+  statutorySearchPlaceholder: string;
+  statutoryIncludeLabel: string;
+  statutoryExcludeLabel: string;
+  statutoryClear: string;
+  statutoryNoSelection: string;
+  statutoryNoMatch: string;
 }
 
 const dictionaries: Record<Locale, Dictionary> = {
@@ -76,6 +97,17 @@ const dictionaries: Record<Locale, Dictionary> = {
     trendHeading: "Average days from filing to decision, over time",
     trendYearAxis: "Year",
     trendNationalLabel: "National average",
+    inFavourHeadingAll: "Decision outcome, by municipality and year",
+    inFavourHeadingYear: "Decision outcome in {year}, by municipality",
+    inFavourHeadingMunicipality: "Decision outcome in {municipality}, by year",
+    inFavourHeadingBoth: "Decision outcome in {municipality}, {year}",
+    inFavourViewMunicipality: "By municipality",
+    inFavourViewYear: "By year",
+    inFavourTenant: "In favour of tenant",
+    inFavourLandlord: "In favour of landlord",
+    inFavourShared: "Shared",
+    inFavourNotSet: "Not set",
+    percentAxis: "% of decisions",
     noDataPrefix: "No data yet. Run",
     noDataSuffix: "to pull decisions from the huslejenaevn.dk API.",
     noMatch: "No decisions match this filter.",
@@ -88,6 +120,17 @@ const dictionaries: Record<Locale, Dictionary> = {
       "{n} decisions excluded from these averages (dateOfDecision precedes dateOfFiling in the source data).",
     otherLanguageLabel: "Dansk",
     attribution: "Unofficial dashboard built on public data from huslejenaevn.dk",
+    statutesNavLink: "Filter by statute",
+    backToDashboard: "← Back to dashboard",
+    statutesPageTitle: "Filter by statute",
+    statutesPageSubtitle:
+      "See how case outcomes and processing time differ by the law, chapter, or paragraph (§) a decision cites.",
+    statutorySearchPlaceholder: "Search laws, chapters, paragraphs…",
+    statutoryIncludeLabel: "Include",
+    statutoryExcludeLabel: "Exclude",
+    statutoryClear: "Clear",
+    statutoryNoSelection: "No statutes selected — showing all decisions.",
+    statutoryNoMatch: "No statutes match your search.",
   },
   da: {
     locale: "da-DK",
@@ -123,6 +166,17 @@ const dictionaries: Record<Locale, Dictionary> = {
     trendHeading: "Gennemsnitligt antal dage fra indbringelse til afgørelse, over tid",
     trendYearAxis: "År",
     trendNationalLabel: "Landsgennemsnit",
+    inFavourHeadingAll: "Udfald af afgørelser, pr. kommune og år",
+    inFavourHeadingYear: "Udfald af afgørelser i {year}, pr. kommune",
+    inFavourHeadingMunicipality: "Udfald af afgørelser i {municipality}, pr. år",
+    inFavourHeadingBoth: "Udfald af afgørelser i {municipality}, {year}",
+    inFavourViewMunicipality: "Pr. kommune",
+    inFavourViewYear: "Pr. år",
+    inFavourTenant: "Medhold til lejer",
+    inFavourLandlord: "Medhold til udlejer",
+    inFavourShared: "Delt medhold",
+    inFavourNotSet: "Ikke angivet",
+    percentAxis: "% af afgørelser",
     noDataPrefix: "Ingen data endnu. Kør",
     noDataSuffix: "for at hente afgørelser fra huslejenaevn.dk's API.",
     noMatch: "Ingen afgørelser matcher dette filter.",
@@ -135,6 +189,17 @@ const dictionaries: Record<Locale, Dictionary> = {
       "{n} afgørelser udelukket fra disse gennemsnit (afgørelsesdato ligger før klagedato i kildedata).",
     otherLanguageLabel: "English",
     attribution: "Uofficielt dashboard baseret på offentlige data fra huslejenaevn.dk",
+    statutesNavLink: "Filtrér efter lovhjemmel",
+    backToDashboard: "← Tilbage til dashboard",
+    statutesPageTitle: "Filtrér efter lovhjemmel",
+    statutesPageSubtitle:
+      "Se hvordan udfald og sagsbehandlingstid varierer efter den lov, det kapitel eller den paragraf (§), en afgørelse henviser til.",
+    statutorySearchPlaceholder: "Søg efter love, kapitler, paragraffer…",
+    statutoryIncludeLabel: "Medtag",
+    statutoryExcludeLabel: "Udeluk",
+    statutoryClear: "Ryd",
+    statutoryNoSelection: "Ingen lovhjemler valgt — viser alle afgørelser.",
+    statutoryNoMatch: "Ingen lovhjemler matcher din søgning.",
   },
 };
 
@@ -147,4 +212,20 @@ export function getDictionary(locale: Locale): Dictionary {
 export function formatExcludedNote(t: Dictionary, n: number): string {
   const template = n === 1 ? t.excludedNoteOne : t.excludedNoteOther;
   return template.replace("{n}", n.toLocaleString(t.locale));
+}
+
+export function formatInFavourHeading(
+  t: Dictionary,
+  { year, municipalityName }: { year?: string; municipalityName?: string | null }
+): string {
+  if (municipalityName && year) {
+    return t.inFavourHeadingBoth.replace("{municipality}", municipalityName).replace("{year}", year);
+  }
+  if (municipalityName) {
+    return t.inFavourHeadingMunicipality.replace("{municipality}", municipalityName);
+  }
+  if (year) {
+    return t.inFavourHeadingYear.replace("{year}", year);
+  }
+  return t.inFavourHeadingAll;
 }

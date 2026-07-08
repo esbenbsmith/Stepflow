@@ -18,6 +18,15 @@ if (!API_KEY) {
   throw new Error("HUSLEJENAEVN_API_KEY is not set (check .env.local)");
 }
 
+type Statutory = {
+  lawId: string;
+  lawText: string;
+  chapterId: string | null;
+  chapterText: string | null;
+  sectionId: string | null;
+  sectionText: string | null;
+};
+
 type DecisionRow = {
   id: string;
   municipalityCode: string;
@@ -25,6 +34,8 @@ type DecisionRow = {
   dateOfFiling: string;
   dateOfDecision: string;
   decisiveBoard: string;
+  inFavour: string;
+  statutories: Statutory[];
 };
 
 const QUERY = `
@@ -43,6 +54,15 @@ const QUERY = `
         dateOfFiling
         dateOfDecision
         decisiveBoard
+        inFavour
+        statutories {
+          lawId
+          lawText
+          chapterId
+          chapterText
+          sectionId
+          sectionText
+        }
       }
     }
   }
@@ -80,17 +100,37 @@ function sleep(ms: number) {
 async function main() {
   const db = getDb();
   const upsert = db.prepare(`
-    INSERT INTO decisions (id, municipality_code, municipality_name, date_of_filing, date_of_decision, decisive_board)
-    VALUES (@id, @municipalityCode, @municipalityName, @dateOfFiling, @dateOfDecision, @decisiveBoard)
+    INSERT INTO decisions (id, municipality_code, municipality_name, date_of_filing, date_of_decision, decisive_board, in_favour)
+    VALUES (@id, @municipalityCode, @municipalityName, @dateOfFiling, @dateOfDecision, @decisiveBoard, @inFavour)
     ON CONFLICT(id) DO UPDATE SET
       municipality_code = excluded.municipality_code,
       municipality_name = excluded.municipality_name,
       date_of_filing = excluded.date_of_filing,
       date_of_decision = excluded.date_of_decision,
-      decisive_board = excluded.decisive_board
+      decisive_board = excluded.decisive_board,
+      in_favour = excluded.in_favour
+  `);
+  const deleteStatutories = db.prepare(`DELETE FROM decision_statutories WHERE decision_id = @decisionId`);
+  const insertStatutory = db.prepare(`
+    INSERT INTO decision_statutories (decision_id, law_id, law_text, chapter_id, chapter_text, section_id, section_text)
+    VALUES (@decisionId, @lawId, @lawText, @chapterId, @chapterText, @sectionId, @sectionText)
   `);
   const upsertMany = db.transaction((rows: DecisionRow[]) => {
-    for (const row of rows) upsert.run(row);
+    for (const row of rows) {
+      upsert.run(row);
+      deleteStatutories.run({ decisionId: row.id });
+      for (const s of row.statutories) {
+        insertStatutory.run({
+          decisionId: row.id,
+          lawId: s.lawId,
+          lawText: s.lawText,
+          chapterId: s.chapterId ?? "",
+          chapterText: s.chapterText ?? "",
+          sectionId: s.sectionId ?? "",
+          sectionText: s.sectionText ?? "",
+        });
+      }
+    }
   });
 
   let skip = 0;

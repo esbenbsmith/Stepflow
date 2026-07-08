@@ -1,8 +1,8 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
 import type { MunicipalityOption } from "@/lib/db";
 import type { Dictionary } from "@/lib/i18n";
+import { useFilterParam } from "@/lib/useFilterParam";
 
 export function FiltersBar({
   years,
@@ -15,18 +15,7 @@ export function FiltersBar({
   decisiveBoards: string[];
   t: Dictionary;
 }) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
-  function setParam(key: string, value: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (value) {
-      params.set(key, value);
-    } else {
-      params.delete(key);
-    }
-    router.push(`?${params.toString()}`);
-  }
+  const { searchParams, setParam } = useFilterParam();
 
   const selectClass =
     "rounded border border-[var(--border)] bg-[var(--surface-1)] px-2 py-1.5 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]";
