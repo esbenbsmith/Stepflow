@@ -68,6 +68,131 @@ const QUERY = `
   }
 `;
 
+// A separate, filter-free count of every case regardless of status (in
+// progress, dismissed, decided, ...) — the main sync only pulls cases with
+// both dateOfFiling and dateOfDecision set, so this can't be derived from
+// the local decisions table.
+const TOTAL_CASE_COUNT_QUERY = `
+  query TotalCaseCount {
+    pagedDecisions(skip: 0, take: 1) {
+      totalCount
+    }
+  }
+`;
+
+async function fetchTotalCaseCount(): Promise<number> {
+  const res = await fetch(`${API_URL}/graphql`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-KEY": API_KEY!,
+    },
+    body: JSON.stringify({ query: TOTAL_CASE_COUNT_QUERY }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Request failed fetching total case count: ${res.status} ${res.statusText}`);
+  }
+
+  const json = await res.json();
+  if (json.errors) {
+    throw new Error(`GraphQL error fetching total case count: ${JSON.stringify(json.errors)}`);
+  }
+  return json.data.pagedDecisions.totalCount;
+}
+
+// Breaks case counts down by why the case was closed (or that it hasn't been
+// assigned one yet) — this is how "dismissed", "settled", etc. are surfaced,
+// since the main sync's decisions table only holds cases that reached an
+// actual decision. Bucketed by year of filing rather than year of decision:
+// dismissed/not-set cases have no dateOfDecision, but every case has a
+// dateOfFiling.
+const REASON_FOR_CLOSING_VALUES = [
+  "NOT_SET",
+  "DISMISSED",
+  "IN_FAVOUR",
+  "REJECTED",
+  "SETTLEMENT",
+  "IN_PARTIAL_FAVOUR",
+] as const;
+
+const FILING_YEAR_RANGE_QUERY = `
+  query FilingYearRange {
+    oldest: pagedDecisions(skip: 0, take: 1, order: { dateOfFiling: ASC }, where: { dateOfFiling: { neq: null } }) {
+      items { dateOfFiling }
+    }
+    newest: pagedDecisions(skip: 0, take: 1, order: { dateOfFiling: DESC }, where: { dateOfFiling: { neq: null } }) {
+      items { dateOfFiling }
+    }
+  }
+`;
+
+async function fetchFilingYearRange(): Promise<{ firstYear: number; lastYear: number }> {
+  const res = await fetch(`${API_URL}/graphql`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-API-KEY": API_KEY! },
+    body: JSON.stringify({ query: FILING_YEAR_RANGE_QUERY }),
+  });
+  if (!res.ok) {
+    throw new Error(`Request failed fetching filing year range: ${res.status} ${res.statusText}`);
+  }
+  const json = await res.json();
+  if (json.errors) {
+    throw new Error(`GraphQL error fetching filing year range: ${JSON.stringify(json.errors)}`);
+  }
+  const firstYear = new Date(json.data.oldest.items[0].dateOfFiling).getUTCFullYear();
+  const lastYear = new Date(json.data.newest.items[0].dateOfFiling).getUTCFullYear();
+  return { firstYear, lastYear };
+}
+
+function reasonForClosingByYearQuery(year: number): string {
+  const fields = REASON_FOR_CLOSING_VALUES.map(
+    (v) =>
+      `${v}: pagedDecisions(skip: 0, take: 1, where: { dateOfFiling: { gte: "${year}-01-01T00:00:00Z", lt: "${year + 1}-01-01T00:00:00Z" }, reasonForClosing: { eq: ${v} } }) { totalCount }`
+  ).join("\n    ");
+  return `query ReasonForClosingByYear { ${fields} }`;
+}
+
+async function fetchReasonForClosingForYear(year: number, attempt = 1): Promise<Record<string, number>> {
+  const res = await fetch(`${API_URL}/graphql`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-API-KEY": API_KEY! },
+    body: JSON.stringify({ query: reasonForClosingByYearQuery(year) }),
+  });
+
+  if (!res.ok) {
+    if (attempt < 3) {
+      await sleep(1000 * attempt);
+      return fetchReasonForClosingForYear(year, attempt + 1);
+    }
+    throw new Error(`Request failed fetching reason-for-closing counts for ${year}: ${res.status} ${res.statusText}`);
+  }
+
+  const json = await res.json();
+  if (json.errors) {
+    if (attempt < 3) {
+      await sleep(1000 * attempt);
+      return fetchReasonForClosingForYear(year, attempt + 1);
+    }
+    throw new Error(`GraphQL error fetching reason-for-closing counts for ${year}: ${JSON.stringify(json.errors)}`);
+  }
+  const counts: Record<string, number> = {};
+  for (const v of REASON_FOR_CLOSING_VALUES) {
+    counts[v] = json.data[v].totalCount;
+  }
+  return counts;
+}
+
+async function fetchReasonForClosingByYear(): Promise<Record<string, Record<string, number>>> {
+  const { firstYear, lastYear } = await fetchFilingYearRange();
+  const byYear: Record<string, Record<string, number>> = {};
+  for (let year = firstYear; year <= lastYear; year++) {
+    byYear[year] = await fetchReasonForClosingForYear(year);
+    await sleep(DELAY_MS);
+  }
+  return byYear;
+}
+
 async function fetchPage(skip: number, attempt = 1): Promise<{ totalCount: number; items: DecisionRow[] }> {
   const res = await fetch(`${API_URL}/graphql`, {
     method: "POST",
@@ -132,6 +257,29 @@ async function main() {
       }
     }
   });
+
+  const totalCaseCount = await fetchTotalCaseCount();
+  db.prepare(
+    `INSERT INTO sync_meta (key, value) VALUES ('total_case_count', @value)
+     ON CONFLICT(key) DO UPDATE SET value = @value`
+  ).run({ value: String(totalCaseCount) });
+
+  const reasonForClosingByYear = await fetchReasonForClosingByYear();
+  db.prepare(
+    `INSERT INTO sync_meta (key, value) VALUES ('reason_for_closing_by_year', @value)
+     ON CONFLICT(key) DO UPDATE SET value = @value`
+  ).run({ value: JSON.stringify(reasonForClosingByYear) });
+
+  const reasonForClosingCounts: Record<string, number> = {};
+  for (const yearCounts of Object.values(reasonForClosingByYear)) {
+    for (const [reason, count] of Object.entries(yearCounts)) {
+      reasonForClosingCounts[reason] = (reasonForClosingCounts[reason] ?? 0) + count;
+    }
+  }
+  db.prepare(
+    `INSERT INTO sync_meta (key, value) VALUES ('reason_for_closing_counts', @value)
+     ON CONFLICT(key) DO UPDATE SET value = @value`
+  ).run({ value: JSON.stringify(reasonForClosingCounts) });
 
   let skip = 0;
   let totalCount = Infinity;

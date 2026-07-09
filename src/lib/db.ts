@@ -345,3 +345,59 @@ export function getSyncMeta(key: string): string | null {
     .get(key) as { value: string } | undefined;
   return row?.value ?? null;
 }
+
+// All cases regardless of status (in progress, dismissed, decided, ...) —
+// set by scripts/sync.ts, since the decisions table only holds cases with
+// both dateOfFiling and dateOfDecision set.
+export function getTotalCaseCount(): number {
+  const value = getSyncMeta("total_case_count");
+  return value ? Number(value) : 0;
+}
+
+export type ReasonForClosingCounts = {
+  NOT_SET: number;
+  DISMISSED: number;
+  IN_FAVOUR: number;
+  REJECTED: number;
+  SETTLEMENT: number;
+  IN_PARTIAL_FAVOUR: number;
+};
+
+const EMPTY_REASON_FOR_CLOSING_COUNTS: ReasonForClosingCounts = {
+  NOT_SET: 0,
+  DISMISSED: 0,
+  IN_FAVOUR: 0,
+  REJECTED: 0,
+  SETTLEMENT: 0,
+  IN_PARTIAL_FAVOUR: 0,
+};
+
+// Every case has exactly one reasonForClosing value, so these counts sum to
+// getTotalCaseCount() — set by scripts/sync.ts.
+export function getReasonForClosingCounts(): ReasonForClosingCounts {
+  const value = getSyncMeta("reason_for_closing_counts");
+  if (!value) return EMPTY_REASON_FOR_CLOSING_COUNTS;
+  try {
+    return { ...EMPTY_REASON_FOR_CLOSING_COUNTS, ...JSON.parse(value) };
+  } catch {
+    return EMPTY_REASON_FOR_CLOSING_COUNTS;
+  }
+}
+
+export type ReasonForClosingByYear = { year: string } & ReasonForClosingCounts;
+
+// Bucketed by year of filing (not year of decision) — set by scripts/sync.ts.
+// Dismissed/not-set cases have no dateOfDecision, but every case has a
+// dateOfFiling, so filing year is the only year dimension that covers them.
+export function getReasonForClosingByYear(): ReasonForClosingByYear[] {
+  const value = getSyncMeta("reason_for_closing_by_year");
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as Record<string, Partial<ReasonForClosingCounts>>;
+    return Object.entries(parsed)
+      .map(([year, counts]) => ({ year, ...EMPTY_REASON_FOR_CLOSING_COUNTS, ...counts }))
+      .sort((a, b) => a.year.localeCompare(b.year));
+  } catch {
+    return [];
+  }
+}

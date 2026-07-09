@@ -7,11 +7,15 @@ import {
   getMunicipalityAverages,
   getMunicipalityOptions,
   getOverall,
+  getReasonForClosingByYear,
+  getReasonForClosingCounts,
   getSyncMeta,
+  getTotalCaseCount,
   getYearOptions,
   getYearlyAverages,
 } from "@/lib/db";
 import { formatExcludedNote, formatInFavourHeading, getDictionary, type Locale } from "@/lib/i18n";
+import { CaseStatusChart } from "@/components/CaseStatusChart";
 import { FiltersBar } from "@/components/FiltersBar";
 import { InFavourChart } from "@/components/InFavourChart";
 import { MunicipalityChart } from "@/components/MunicipalityChart";
@@ -98,6 +102,13 @@ export async function Dashboard({
   }
 
   const overall = getOverall(filters);
+  const totalCaseCount = getTotalCaseCount();
+  const reasonForClosingByYear = getReasonForClosingByYear();
+  const reasonForClosingBreakdown = Object.entries(getReasonForClosingCounts())
+    .filter(([, count]) => count > 0)
+    .sort(([, a], [, b]) => b - a)
+    .map(([key, count]) => `${count.toLocaleString(t.locale)} ${t.reasonForClosingLabels[key] ?? key}`)
+    .join(" · ");
   const municipalities = getMunicipalityAverages(filters);
   const excludedCount = getExcludedCount(filters);
 
@@ -132,6 +143,12 @@ export async function Dashboard({
             <p className="mt-1 text-sm text-[var(--text-secondary)]">
               {t.subtitle}
             </p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
+              {t.totalCasesLabel}: {totalCaseCount.toLocaleString(t.locale)}
+            </p>
+            {reasonForClosingBreakdown && (
+              <p className="mt-0.5 text-xs text-[var(--text-muted)]">{reasonForClosingBreakdown}</p>
+            )}
           </div>
           <div className="flex items-center gap-4">
             {StatutesLink}
@@ -188,6 +205,12 @@ export async function Dashboard({
               heading={inFavourHeading}
               t={t}
             />
+          </div>
+        )}
+
+        {reasonForClosingByYear.length > 0 && (
+          <div className="mt-8">
+            <CaseStatusChart data={reasonForClosingByYear} t={t} />
           </div>
         )}
 

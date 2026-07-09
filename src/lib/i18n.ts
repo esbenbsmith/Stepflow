@@ -13,6 +13,8 @@ export interface Dictionary {
   boardLabels: Record<string, string>;
   average: string;
   decisionsCounted: string;
+  totalCasesLabel: string;
+  reasonForClosingLabels: Record<string, string>;
   municipalities: string;
   chartHeading: string;
   chartTab: string;
@@ -60,6 +62,9 @@ export interface Dictionary {
   statutoryClear: string;
   statutoryNoSelection: string;
   statutoryNoMatch: string;
+  caseStatusHeading: string;
+  caseStatusCountAxis: string;
+  caseStatusTableTotal: string;
 }
 
 const dictionaries: Record<Locale, Dictionary> = {
@@ -81,6 +86,15 @@ const dictionaries: Record<Locale, Dictionary> = {
     },
     average: "Average",
     decisionsCounted: "Decisions counted",
+    totalCasesLabel: "Total cases tracked",
+    reasonForClosingLabels: {
+      NOT_SET: "not set",
+      DISMISSED: "dismissed",
+      IN_FAVOUR: "decided",
+      REJECTED: "rejected",
+      SETTLEMENT: "settled",
+      IN_PARTIAL_FAVOUR: "partially decided",
+    },
     municipalities: "Municipalities",
     chartHeading: "Average days from filing to decision, by municipality",
     chartTab: "Chart",
@@ -131,6 +145,9 @@ const dictionaries: Record<Locale, Dictionary> = {
     statutoryClear: "Clear",
     statutoryNoSelection: "No statutes selected — showing all decisions.",
     statutoryNoMatch: "No statutes match your search.",
+    caseStatusHeading: "All cases, by year and status",
+    caseStatusCountAxis: "Cases",
+    caseStatusTableTotal: "Total",
   },
   da: {
     locale: "da-DK",
@@ -150,6 +167,15 @@ const dictionaries: Record<Locale, Dictionary> = {
     },
     average: "Gennemsnit",
     decisionsCounted: "Afgørelser talt med",
+    totalCasesLabel: "Sager i alt registreret",
+    reasonForClosingLabels: {
+      NOT_SET: "ikke angivet",
+      DISMISSED: "henlagt",
+      IN_FAVOUR: "afgjort",
+      REJECTED: "afvist",
+      SETTLEMENT: "forligt",
+      IN_PARTIAL_FAVOUR: "delvist afgjort",
+    },
     municipalities: "Kommuner",
     chartHeading: "Gennemsnitligt antal dage fra indbringelse til afgørelse, pr. kommune",
     chartTab: "Diagram",
@@ -200,6 +226,9 @@ const dictionaries: Record<Locale, Dictionary> = {
     statutoryClear: "Ryd",
     statutoryNoSelection: "Ingen lovhjemler valgt — viser alle afgørelser.",
     statutoryNoMatch: "Ingen lovhjemler matcher din søgning.",
+    caseStatusHeading: "Alle sager, pr. år og status",
+    caseStatusCountAxis: "Sager",
+    caseStatusTableTotal: "I alt",
   },
 };
 
