@@ -401,3 +401,29 @@ export function getReasonForClosingByYear(): ReasonForClosingByYear[] {
     return [];
   }
 }
+
+export type ReasonForClosingByQuarter = { year: string; quarter: number; period: string } & ReasonForClosingCounts;
+
+// Same as getReasonForClosingByYear, bucketed by quarter of filing instead
+// (keys stored as "2023-Q1" etc.) — set by scripts/sync.ts.
+export function getReasonForClosingByQuarter(): ReasonForClosingByQuarter[] {
+  const value = getSyncMeta("reason_for_closing_by_quarter");
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as Record<string, Partial<ReasonForClosingCounts>>;
+    return Object.entries(parsed)
+      .map(([key, counts]) => {
+        const [year, quarterPart] = key.split("-Q");
+        return {
+          year,
+          quarter: Number(quarterPart),
+          period: `${year} Q${quarterPart}`,
+          ...EMPTY_REASON_FOR_CLOSING_COUNTS,
+          ...counts,
+        };
+      })
+      .sort((a, b) => a.year.localeCompare(b.year) || a.quarter - b.quarter);
+  } catch {
+    return [];
+  }
+}

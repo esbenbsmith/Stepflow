@@ -65,6 +65,8 @@ export interface Dictionary {
   caseStatusHeading: string;
   caseStatusCountAxis: string;
   caseStatusTableTotal: string;
+  quarterlyStatusHeading: string;
+  quarterlyStatusQuarter: string;
 }
 
 const dictionaries: Record<Locale, Dictionary> = {
@@ -148,6 +150,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     caseStatusHeading: "All cases, by year and status",
     caseStatusCountAxis: "Cases",
     caseStatusTableTotal: "Total",
+    quarterlyStatusHeading: "All cases, by quarter and status",
+    quarterlyStatusQuarter: "Quarter",
   },
   da: {
     locale: "da-DK",
@@ -229,6 +233,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     caseStatusHeading: "Alle sager, pr. år og status",
     caseStatusCountAxis: "Sager",
     caseStatusTableTotal: "I alt",
+    quarterlyStatusHeading: "Alle sager, pr. kvartal og status",
+    quarterlyStatusQuarter: "Kvartal",
   },
 };
 

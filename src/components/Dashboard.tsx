@@ -7,6 +7,7 @@ import {
   getMunicipalityAverages,
   getMunicipalityOptions,
   getOverall,
+  getReasonForClosingByQuarter,
   getReasonForClosingByYear,
   getReasonForClosingCounts,
   getSyncMeta,
@@ -19,6 +20,7 @@ import { CaseStatusChart } from "@/components/CaseStatusChart";
 import { FiltersBar } from "@/components/FiltersBar";
 import { InFavourChart } from "@/components/InFavourChart";
 import { MunicipalityChart } from "@/components/MunicipalityChart";
+import { QuarterlyStatusTable } from "@/components/QuarterlyStatusTable";
 import { StatTile } from "@/components/StatTile";
 import { TrendChart } from "@/components/TrendChart";
 
@@ -104,6 +106,7 @@ export async function Dashboard({
   const overall = getOverall(filters);
   const totalCaseCount = getTotalCaseCount();
   const reasonForClosingByYear = getReasonForClosingByYear();
+  const reasonForClosingByQuarter = getReasonForClosingByQuarter();
   const reasonForClosingBreakdown = Object.entries(getReasonForClosingCounts())
     .filter(([, count]) => count > 0)
     .sort(([, a], [, b]) => b - a)
@@ -211,6 +214,12 @@ export async function Dashboard({
         {reasonForClosingByYear.length > 0 && (
           <div className="mt-8">
             <CaseStatusChart data={reasonForClosingByYear} t={t} />
+          </div>
+        )}
+
+        {reasonForClosingByQuarter.length > 0 && (
+          <div className="mt-8">
+            <QuarterlyStatusTable data={reasonForClosingByQuarter} t={t} />
           </div>
         )}
 
