@@ -176,6 +176,7 @@ export async function StatutesPage({
             {exclusionText.topAffectedText && (
               <p className="mt-2 text-xs text-[var(--text-muted)]">{exclusionText.topAffectedText}</p>
             )}
+            <p className="mt-2 text-xs text-[var(--text-muted)]">{t.exclusionMissingDatesNote}</p>
           </details>
         )}
       </main>

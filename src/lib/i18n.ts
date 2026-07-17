@@ -53,6 +53,7 @@ export interface Dictionary {
   exclusionReasonInvalidDuration: string;
   exclusionReasonBefore2012: string;
   exclusionTopAffected: string;
+  exclusionMissingDatesNote: string;
   otherLanguageLabel: string;
   attribution: string;
   statutesNavLink: string;
@@ -72,6 +73,7 @@ export interface Dictionary {
   quarterlyStatusQuarter: string;
   decisionStatusHeading: string;
   decisionStatusLabel: string;
+  allCasesVsFilteredNote: string;
 }
 
 const dictionaries: Record<Locale, Dictionary> = {
@@ -142,6 +144,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     exclusionReasonBefore2012:
       "{n} — filed or decided before 2012, outside the range with enough volume to be statistically meaningful.",
     exclusionTopAffected: "Most affected by the date-order issue: {list}.",
+    exclusionMissingDatesNote:
+      "Cases missing a dateOfDecision (or, in principle, a dateOfFiling) entirely are never synced into this database at all, so they aren't part of the count above either — those cases fall outside this filtered view completely.",
     otherLanguageLabel: "Dansk",
     attribution: "Unofficial dashboard built on public data from huslejenaevn.dk",
     statutesNavLink: "Filter by statute",
@@ -162,6 +166,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     quarterlyStatusQuarter: "Quarter",
     decisionStatusHeading: "Status of decisions counted",
     decisionStatusLabel: "Status",
+    allCasesVsFilteredNote:
+      "This covers every case in the source system. \"Decisions counted\" below uses a smaller, filtered subset of these — see the note near the bottom for what's excluded and why.",
   },
   da: {
     locale: "da-DK",
@@ -230,6 +236,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     exclusionReasonBefore2012:
       "{n} — indbragt eller afgjort før 2012, uden for det interval, hvor der er nok volumen til at være statistisk meningsfuldt.",
     exclusionTopAffected: "Mest berørt af datorækkefølge-problemet: {list}.",
+    exclusionMissingDatesNote:
+      "Sager helt uden en afgørelsesdato (eller i princippet en indbringelsesdato) bliver aldrig synkroniseret til denne database, så de er heller ikke en del af tallet ovenfor — de falder helt uden for denne filtrerede visning.",
     otherLanguageLabel: "English",
     attribution: "Uofficielt dashboard baseret på offentlige data fra huslejenaevn.dk",
     statutesNavLink: "Filtrér efter lovhjemmel",
@@ -250,6 +258,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     quarterlyStatusQuarter: "Kvartal",
     decisionStatusHeading: "Status for talte afgørelser",
     decisionStatusLabel: "Status",
+    allCasesVsFilteredNote:
+      "Dette dækker alle sager i kildesystemet. \"Afgørelser talt med\" nedenfor bruger en mindre, filtreret delmængde af disse — se noten nederst for, hvad der er udeladt, og hvorfor.",
   },
 };
 

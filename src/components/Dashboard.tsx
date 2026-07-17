@@ -157,6 +157,7 @@ export async function Dashboard({
             {reasonForClosingBreakdown && (
               <p className="mt-0.5 text-xs text-[var(--text-muted)]">{reasonForClosingBreakdown}</p>
             )}
+            <p className="mt-1 text-xs italic text-[var(--text-muted)]">{t.allCasesVsFilteredNote}</p>
           </div>
           <div className="flex items-center gap-4">
             {StatutesLink}
@@ -253,6 +254,7 @@ export async function Dashboard({
             {exclusionText.topAffectedText && (
               <p className="mt-2 text-xs text-[var(--text-muted)]">{exclusionText.topAffectedText}</p>
             )}
+            <p className="mt-2 text-xs text-[var(--text-muted)]">{t.exclusionMissingDatesNote}</p>
           </details>
         )}
       </main>
