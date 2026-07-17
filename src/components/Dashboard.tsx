@@ -1,7 +1,8 @@
 import Link from "next/link";
 import {
+  getDecisionStatusBreakdown,
   getDecisiveBoardOptions,
-  getExcludedCount,
+  getExclusionBreakdown,
   getInFavourByMunicipality,
   getInFavourByYear,
   getMunicipalityAverages,
@@ -15,8 +16,9 @@ import {
   getYearOptions,
   getYearlyAverages,
 } from "@/lib/db";
-import { formatExcludedNote, formatInFavourHeading, getDictionary, type Locale } from "@/lib/i18n";
+import { formatExclusionBreakdown, formatInFavourHeading, getDictionary, type Locale } from "@/lib/i18n";
 import { CaseStatusChart } from "@/components/CaseStatusChart";
+import { DecisionStatusTable } from "@/components/DecisionStatusTable";
 import { FiltersBar } from "@/components/FiltersBar";
 import { InFavourChart } from "@/components/InFavourChart";
 import { MunicipalityChart } from "@/components/MunicipalityChart";
@@ -113,7 +115,10 @@ export async function Dashboard({
     .map(([key, count]) => `${count.toLocaleString(t.locale)} ${t.reasonForClosingLabels[key] ?? key}`)
     .join(" · ");
   const municipalities = getMunicipalityAverages(filters);
-  const excludedCount = getExcludedCount(filters);
+  const decisionStatusBreakdown = getDecisionStatusBreakdown(filters);
+  const exclusionBreakdown = getExclusionBreakdown(filters);
+  const exclusionTotal = exclusionBreakdown.invalidDuration + exclusionBreakdown.before2012;
+  const exclusionText = formatExclusionBreakdown(t, exclusionBreakdown);
 
   const trendFilters = { decisiveBoard: filters.decisiveBoard };
   const nationalTrend = getYearlyAverages(trendFilters);
@@ -181,6 +186,8 @@ export async function Dashboard({
           />
         </div>
 
+        <DecisionStatusTable data={decisionStatusBreakdown} t={t} />
+
         {nationalTrend.length > 0 && (
           <div className="mb-8">
             <TrendChart
@@ -235,10 +242,18 @@ export async function Dashboard({
           </a>
         </p>
 
-        {excludedCount > 0 && (
-          <div className="mt-3 rounded border-l-4 border-[var(--info-border)] bg-[var(--info-bg)] px-4 py-3 text-sm text-[var(--text-primary)]">
-            {formatExcludedNote(t, excludedCount)}
-          </div>
+        {exclusionTotal > 0 && (
+          <details className="mt-3 rounded border-l-4 border-[var(--info-border)] bg-[var(--info-bg)] px-4 py-3 text-sm text-[var(--text-primary)]">
+            <summary className="cursor-pointer">{exclusionText.toggleText}</summary>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-[var(--text-secondary)]">
+              {exclusionText.reasonLines.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+            {exclusionText.topAffectedText && (
+              <p className="mt-2 text-xs text-[var(--text-muted)]">{exclusionText.topAffectedText}</p>
+            )}
+          </details>
         )}
       </main>
     </>

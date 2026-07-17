@@ -18,7 +18,8 @@ export function getDb(): Database.Database {
       date_of_filing TEXT NOT NULL,
       date_of_decision TEXT NOT NULL,
       decisive_board TEXT NOT NULL DEFAULT '',
-      in_favour TEXT NOT NULL DEFAULT ''
+      in_favour TEXT NOT NULL DEFAULT '',
+      reason_for_closing TEXT NOT NULL DEFAULT ''
     );
     CREATE INDEX IF NOT EXISTS idx_decisions_municipality ON decisions (municipality_code);
     CREATE INDEX IF NOT EXISTS idx_decisions_decision_year ON decisions (date_of_decision);
@@ -44,13 +45,16 @@ export function getDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_decision_statutories_section ON decision_statutories (section_id);
   `);
 
-  // Migration for DBs created before decisive_board/in_favour existed.
+  // Migration for DBs created before decisive_board/in_favour/reason_for_closing existed.
   const columns = db.prepare("PRAGMA table_info(decisions)").all() as { name: string }[];
   if (!columns.some((c) => c.name === "decisive_board")) {
     db.exec("ALTER TABLE decisions ADD COLUMN decisive_board TEXT NOT NULL DEFAULT ''");
   }
   if (!columns.some((c) => c.name === "in_favour")) {
     db.exec("ALTER TABLE decisions ADD COLUMN in_favour TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columns.some((c) => c.name === "reason_for_closing")) {
+    db.exec("ALTER TABLE decisions ADD COLUMN reason_for_closing TEXT NOT NULL DEFAULT ''");
   }
 
   return db;
@@ -64,12 +68,31 @@ export type Filters = {
   excludeSectionIds?: string[];
 };
 
-// A handful of decisions carry a dateOfFiling that postdates dateOfDecision —
-// e.g. a batch of Skive Kommune's backlog was imported with the import date
-// stamped as dateOfFiling instead of the real historical date. A case can't be
-// decided before it's filed, so these are excluded from averages rather than
-// silently skewing them (see getExcludedCount for a visible tally).
-const VALID_DURATION = "julianday(date_of_decision) >= julianday(date_of_filing)";
+// A handful of decisions carry a dateOfFiling that postdates dateOfDecision.
+// There's no single explanation: the affected rows span 10+ municipalities
+// (Copenhagen and Aarhus have more of them than Skive Kommune, despite an
+// earlier version of this comment blaming a Skive-specific import batch),
+// and the gap ranges from under a day to over a decade. About a quarter of
+// them do share a real fingerprint — dateOfFiling stamped with the exact
+// system-clock time of a recent write (Skive-heavy, but not exclusive to it,
+// and evidently still ongoing rather than a one-off historical batch) — while
+// dateOfDecision stays a clean date. The rest show no such pattern. The API's
+// effectiveDate field can't help disambiguate: it was checked and always
+// mirrors dateOfDecision exactly, so it carries no independent signal.
+//
+// A case can't be decided before it's filed, so rows more than a day off are
+// excluded from every statistic rather than silently skewing them (see
+// getExclusionBreakdown for a visible, per-reason tally). Rows within a day
+// are tolerated as same-day noise and clamped to 0 duration instead —
+// plausibly just a timezone/rounding artifact rather than bad data.
+const VALID_DURATION = "julianday(date_of_decision) >= julianday(date_of_filing) - 1";
+
+// Filed or decided before 2012 — that period has very sparse volume (a
+// handful of cases a year, versus thousands per year from 2012 on) and is
+// treated as outside the statistically meaningful range.
+const NOT_BEFORE_2012 = "strftime('%Y', date_of_filing) >= '2012' AND strftime('%Y', date_of_decision) >= '2012'";
+
+const DURATION_EXPR = "MAX(0, julianday(date_of_decision) - julianday(date_of_filing))";
 
 function sectionIdPlaceholders(prefix: string, ids: string[], params: Record<string, string>): string {
   return ids
@@ -116,7 +139,7 @@ function userConditions(filters: Filters): { conditions: string[]; params: Recor
 function whereClause(filters: Filters): { sql: string; params: Record<string, string> } {
   const { conditions, params } = userConditions(filters);
   return {
-    sql: `WHERE ${[VALID_DURATION, ...conditions].join(" AND ")}`,
+    sql: `WHERE ${[VALID_DURATION, NOT_BEFORE_2012, ...conditions].join(" AND ")}`,
     params,
   };
 }
@@ -136,7 +159,7 @@ export function getMunicipalityAverages(filters: Filters = {}): MunicipalityAver
       SELECT
         municipality_code AS municipalityCode,
         municipality_name AS municipalityName,
-        AVG(julianday(date_of_decision) - julianday(date_of_filing)) AS avgDays,
+        AVG(${DURATION_EXPR}) AS avgDays,
         COUNT(*) AS caseCount
       FROM decisions
       ${sql}
@@ -161,7 +184,7 @@ export function getYearlyAverages(filters: Omit<Filters, "year"> = {}): YearlyAv
       `
       SELECT
         strftime('%Y', date_of_decision) AS year,
-        AVG(julianday(date_of_decision) - julianday(date_of_filing)) AS avgDays,
+        AVG(${DURATION_EXPR}) AS avgDays,
         COUNT(*) AS caseCount
       FROM decisions
       ${sql}
@@ -245,7 +268,7 @@ export function getOverall(filters: Filters = {}): Overall {
     .prepare(
       `
       SELECT
-        AVG(julianday(date_of_decision) - julianday(date_of_filing)) AS avgDays,
+        AVG(${DURATION_EXPR}) AS avgDays,
         COUNT(*) AS caseCount,
         COUNT(DISTINCT municipality_code) AS municipalityCount
       FROM decisions
@@ -254,6 +277,29 @@ export function getOverall(filters: Filters = {}): Overall {
     )
     .get(params) as Overall;
   return row;
+}
+
+export type DecisionStatusCount = { reasonForClosing: string; count: number };
+
+// Exact status breakdown of the same rows counted in "Decisions counted" —
+// uses the same whereClause, so counts always sum to caseCount from
+// getOverall() with matching filters.
+export function getDecisionStatusBreakdown(filters: Filters = {}): DecisionStatusCount[] {
+  const { sql, params } = whereClause(filters);
+  const rows = getDb()
+    .prepare(
+      `
+      SELECT
+        CASE WHEN reason_for_closing = '' THEN 'NOT_SET' ELSE reason_for_closing END AS reasonForClosing,
+        COUNT(*) AS count
+      FROM decisions
+      ${sql}
+      GROUP BY reasonForClosing
+      ORDER BY count DESC
+      `
+    )
+    .all(params) as DecisionStatusCount[];
+  return rows;
 }
 
 export type MunicipalityOption = {
@@ -301,13 +347,50 @@ export function getDecisiveBoardOptions(): string[] {
   return rows.map((r) => r.board);
 }
 
-export function getExcludedCount(filters: Filters = {}): number {
+// Rows failing VALID_DURATION by more than the 1-day tolerance.
+const INVALID_DURATION = "julianday(date_of_decision) < julianday(date_of_filing) - 1";
+
+export type ExclusionBreakdown = {
+  invalidDuration: number;
+  before2012: number;
+  topAffectedMunicipalities: { name: string; count: number }[];
+};
+
+// Each excluded row is attributed to exactly one reason — invalid-duration is
+// checked first, so a row that's both pre-2012 and date-inverted only counts
+// once, under invalidDuration.
+export function getExclusionBreakdown(filters: Filters = {}): ExclusionBreakdown {
   const { conditions, params } = userConditions(filters);
-  const sql = `WHERE NOT (${VALID_DURATION})${conditions.length > 0 ? ` AND ${conditions.join(" AND ")}` : ""}`;
-  const row = getDb()
-    .prepare(`SELECT COUNT(*) AS n FROM decisions ${sql}`)
+  const extra = conditions.length > 0 ? ` AND ${conditions.join(" AND ")}` : "";
+
+  const invalidDurationRow = getDb()
+    .prepare(`SELECT COUNT(*) AS n FROM decisions WHERE ${INVALID_DURATION}${extra}`)
     .get(params) as { n: number };
-  return row.n;
+
+  const before2012Row = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS n FROM decisions WHERE NOT (${INVALID_DURATION}) AND NOT (${NOT_BEFORE_2012})${extra}`
+    )
+    .get(params) as { n: number };
+
+  const topAffectedMunicipalities = getDb()
+    .prepare(
+      `
+      SELECT municipality_name AS name, COUNT(*) AS count
+      FROM decisions
+      WHERE ${INVALID_DURATION}${extra}
+      GROUP BY municipality_name
+      ORDER BY count DESC
+      LIMIT 5
+      `
+    )
+    .all(params) as { name: string; count: number }[];
+
+  return {
+    invalidDuration: invalidDurationRow.n,
+    before2012: before2012Row.n,
+    topAffectedMunicipalities,
+  };
 }
 
 export type StatutoryOption = {

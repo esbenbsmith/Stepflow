@@ -48,8 +48,11 @@ export interface Dictionary {
   lastSynced: string;
   never: string;
   source: string;
-  excludedNoteOne: string;
-  excludedNoteOther: string;
+  exclusionToggleOne: string;
+  exclusionToggleOther: string;
+  exclusionReasonInvalidDuration: string;
+  exclusionReasonBefore2012: string;
+  exclusionTopAffected: string;
   otherLanguageLabel: string;
   attribution: string;
   statutesNavLink: string;
@@ -67,6 +70,8 @@ export interface Dictionary {
   caseStatusTableTotal: string;
   quarterlyStatusHeading: string;
   quarterlyStatusQuarter: string;
+  decisionStatusHeading: string;
+  decisionStatusLabel: string;
 }
 
 const dictionaries: Record<Locale, Dictionary> = {
@@ -130,10 +135,13 @@ const dictionaries: Record<Locale, Dictionary> = {
     lastSynced: "Data last synced",
     never: "never",
     source: "Source",
-    excludedNoteOne:
-      "{n} decision excluded from these averages (dateOfDecision precedes dateOfFiling in the source data).",
-    excludedNoteOther:
-      "{n} decisions excluded from these averages (dateOfDecision precedes dateOfFiling in the source data).",
+    exclusionToggleOne: "{n} decision excluded from these statistics — see why",
+    exclusionToggleOther: "{n} decisions excluded from these statistics — see why",
+    exclusionReasonInvalidDuration:
+      "{n} — the source data has dateOfDecision preceding dateOfFiling, which isn't possible; we don't know which of the two dates is wrong, so these are left out entirely rather than guessed at.",
+    exclusionReasonBefore2012:
+      "{n} — filed or decided before 2012, outside the range with enough volume to be statistically meaningful.",
+    exclusionTopAffected: "Most affected by the date-order issue: {list}.",
     otherLanguageLabel: "Dansk",
     attribution: "Unofficial dashboard built on public data from huslejenaevn.dk",
     statutesNavLink: "Filter by statute",
@@ -152,6 +160,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     caseStatusTableTotal: "Total",
     quarterlyStatusHeading: "All cases, by quarter and status",
     quarterlyStatusQuarter: "Quarter",
+    decisionStatusHeading: "Status of decisions counted",
+    decisionStatusLabel: "Status",
   },
   da: {
     locale: "da-DK",
@@ -213,10 +223,13 @@ const dictionaries: Record<Locale, Dictionary> = {
     lastSynced: "Data sidst synkroniseret",
     never: "aldrig",
     source: "Kilde",
-    excludedNoteOne:
-      "{n} afgørelse udelukket fra disse gennemsnit (afgørelsesdato ligger før klagedato i kildedata).",
-    excludedNoteOther:
-      "{n} afgørelser udelukket fra disse gennemsnit (afgørelsesdato ligger før klagedato i kildedata).",
+    exclusionToggleOne: "{n} afgørelse udelukket fra denne statistik — se hvorfor",
+    exclusionToggleOther: "{n} afgørelser udelukket fra denne statistik — se hvorfor",
+    exclusionReasonInvalidDuration:
+      "{n} — i kildedataen ligger afgørelsesdatoen før klagedatoen, hvilket ikke er muligt; vi ved ikke, hvilken af de to datoer der er forkert, så disse udelades helt frem for at gætte.",
+    exclusionReasonBefore2012:
+      "{n} — indbragt eller afgjort før 2012, uden for det interval, hvor der er nok volumen til at være statistisk meningsfuldt.",
+    exclusionTopAffected: "Mest berørt af datorækkefølge-problemet: {list}.",
     otherLanguageLabel: "English",
     attribution: "Uofficielt dashboard baseret på offentlige data fra huslejenaevn.dk",
     statutesNavLink: "Filtrér efter lovhjemmel",
@@ -235,6 +248,8 @@ const dictionaries: Record<Locale, Dictionary> = {
     caseStatusTableTotal: "I alt",
     quarterlyStatusHeading: "Alle sager, pr. kvartal og status",
     quarterlyStatusQuarter: "Kvartal",
+    decisionStatusHeading: "Status for talte afgørelser",
+    decisionStatusLabel: "Status",
   },
 };
 
@@ -244,9 +259,41 @@ export function getDictionary(locale: Locale): Dictionary {
 
 // Not stored on Dictionary itself — it's a function, and Dictionary values get
 // passed as props to Client Components, which can't serialize functions.
-export function formatExcludedNote(t: Dictionary, n: number): string {
-  const template = n === 1 ? t.excludedNoteOne : t.excludedNoteOther;
-  return template.replace("{n}", n.toLocaleString(t.locale));
+export function formatExclusionBreakdown(
+  t: Dictionary,
+  breakdown: {
+    invalidDuration: number;
+    before2012: number;
+    topAffectedMunicipalities: { name: string; count: number }[];
+  }
+): { toggleText: string; reasonLines: string[]; topAffectedText: string | null } {
+  const total = breakdown.invalidDuration + breakdown.before2012;
+  const toggleTemplate = total === 1 ? t.exclusionToggleOne : t.exclusionToggleOther;
+  const toggleText = toggleTemplate.replace("{n}", total.toLocaleString(t.locale));
+
+  const reasonLines: string[] = [];
+  if (breakdown.invalidDuration > 0) {
+    reasonLines.push(
+      t.exclusionReasonInvalidDuration.replace("{n}", breakdown.invalidDuration.toLocaleString(t.locale))
+    );
+  }
+  if (breakdown.before2012 > 0) {
+    reasonLines.push(
+      t.exclusionReasonBefore2012.replace("{n}", breakdown.before2012.toLocaleString(t.locale))
+    );
+  }
+
+  const topAffectedText =
+    breakdown.topAffectedMunicipalities.length > 0
+      ? t.exclusionTopAffected.replace(
+          "{list}",
+          breakdown.topAffectedMunicipalities
+            .map((m) => `${m.name} (${m.count.toLocaleString(t.locale)})`)
+            .join(", ")
+        )
+      : null;
+
+  return { toggleText, reasonLines, topAffectedText };
 }
 
 export function formatInFavourHeading(

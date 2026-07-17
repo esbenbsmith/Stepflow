@@ -35,6 +35,7 @@ type DecisionRow = {
   dateOfDecision: string;
   decisiveBoard: string;
   inFavour: string;
+  reasonForClosing: string;
   statutories: Statutory[];
 };
 
@@ -55,6 +56,7 @@ const QUERY = `
         dateOfDecision
         decisiveBoard
         inFavour
+        reasonForClosing
         statutories {
           lawId
           lawText
@@ -258,15 +260,16 @@ function sleep(ms: number) {
 async function main() {
   const db = getDb();
   const upsert = db.prepare(`
-    INSERT INTO decisions (id, municipality_code, municipality_name, date_of_filing, date_of_decision, decisive_board, in_favour)
-    VALUES (@id, @municipalityCode, @municipalityName, @dateOfFiling, @dateOfDecision, @decisiveBoard, @inFavour)
+    INSERT INTO decisions (id, municipality_code, municipality_name, date_of_filing, date_of_decision, decisive_board, in_favour, reason_for_closing)
+    VALUES (@id, @municipalityCode, @municipalityName, @dateOfFiling, @dateOfDecision, @decisiveBoard, @inFavour, @reasonForClosing)
     ON CONFLICT(id) DO UPDATE SET
       municipality_code = excluded.municipality_code,
       municipality_name = excluded.municipality_name,
       date_of_filing = excluded.date_of_filing,
       date_of_decision = excluded.date_of_decision,
       decisive_board = excluded.decisive_board,
-      in_favour = excluded.in_favour
+      in_favour = excluded.in_favour,
+      reason_for_closing = excluded.reason_for_closing
   `);
   const deleteStatutories = db.prepare(`DELETE FROM decision_statutories WHERE decision_id = @decisionId`);
   const insertStatutory = db.prepare(`
