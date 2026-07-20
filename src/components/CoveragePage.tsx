@@ -54,6 +54,9 @@ export async function CoveragePage({ locale }: { locale: Locale }) {
                 {t.coveragePageTitle}
               </h1>
               <p className="mt-1 text-sm text-[var(--text-secondary)]">{t.coveragePageSubtitle}</p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
+                {t.coverageMunicipalityCountNote.replace("{count}", String(coverage.length))}
+              </p>
             </div>
             <div className="flex items-center gap-4">
               <Link
@@ -77,12 +80,23 @@ export async function CoveragePage({ locale }: { locale: Locale }) {
         ) : (
           <div className="divide-y divide-[var(--border)] rounded-lg border border-[var(--border)] bg-[var(--surface-1)]">
             {rows.map((row) => (
-              <details key={row.year} className="px-4 py-3">
-                <summary className="flex cursor-pointer items-center justify-between text-sm text-[var(--text-primary)]">
-                  <span>
+              <details key={row.year} className="group px-4 py-3">
+                <summary className="flex list-none cursor-pointer items-center justify-between text-sm text-[var(--text-primary)] [&::-webkit-details-marker]:hidden">
+                  <span className="flex items-center gap-2">
+                    <svg
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      className="h-3 w-3 shrink-0 text-[var(--text-muted)] transition-transform group-open:rotate-90"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
                     {row.year}
                     {row.year === currentYear && (
-                      <span className="ml-1 text-[var(--text-muted)]">*</span>
+                      <span className="text-[var(--text-muted)]">*</span>
                     )}
                   </span>
                   <span className="text-xs tabular-nums text-[var(--text-muted)]">

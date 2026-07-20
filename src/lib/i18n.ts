@@ -77,6 +77,7 @@ export interface Dictionary {
   coverageNavLink: string;
   coveragePageTitle: string;
   coveragePageSubtitle: string;
+  coverageMunicipalityCountNote: string;
   coverageMissingLabel: string;
   coverageNoneMissing: string;
   coverageCurrentYearNote: string;
@@ -178,6 +179,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     coveragePageTitle: "Data coverage",
     coveragePageSubtitle:
       "Which municipalities have zero recorded cases in a given year since 2012 — every case regardless of status, not just the filtered set used elsewhere.",
+    coverageMunicipalityCountNote: "Based on all {count} municipalities recognised by the source system.",
     coverageMissingLabel: "missing",
     coverageNoneMissing: "None — every municipality recorded at least one case.",
     coverageCurrentYearNote:
@@ -278,6 +280,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     coveragePageTitle: "Datadækning",
     coveragePageSubtitle:
       "Hvilke kommuner har nul registrerede sager i et givet år siden 2012 — alle sager uanset status, ikke kun den filtrerede mængde brugt andre steder.",
+    coverageMunicipalityCountNote: "Baseret på alle {count} kommuner, som kildesystemet kender.",
     coverageMissingLabel: "mangler",
     coverageNoneMissing: "Ingen — alle kommuner havde mindst én sag.",
     coverageCurrentYearNote:
