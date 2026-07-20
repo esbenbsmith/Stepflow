@@ -104,12 +104,20 @@ export async function StatutesPage({
               </h1>
               <p className="mt-1 text-sm text-[var(--text-secondary)]">{t.statutesPageSubtitle}</p>
             </div>
-            <Link
-              href={otherHref}
-              className="text-sm text-[var(--link)] underline hover:text-[var(--text-primary)]"
-            >
-              {t.otherLanguageLabel}
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link
+                href={locale === "en" ? "/coverage" : "/coverage/da"}
+                className="text-sm text-[var(--link)] underline hover:text-[var(--text-primary)]"
+              >
+                {t.coverageNavLink}
+              </Link>
+              <Link
+                href={otherHref}
+                className="text-sm text-[var(--link)] underline hover:text-[var(--text-primary)]"
+              >
+                {t.otherLanguageLabel}
+              </Link>
+            </div>
           </div>
         </header>
 

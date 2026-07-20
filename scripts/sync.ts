@@ -228,6 +228,101 @@ async function fetchReasonForClosingByQuarter(
   return byQuarter;
 }
 
+// The canonical list of all Danish municipalities the API knows about — not
+// derived from the local decisions table, since a municipality with zero
+// cases ever would never show up there but should still appear as "missing
+// every year" on the coverage page.
+const MUNICIPALITIES_QUERY = `
+  query Municipalities {
+    municipalities {
+      municipalityCode
+      name
+    }
+  }
+`;
+
+async function fetchAllMunicipalities(): Promise<{ code: string; name: string }[]> {
+  const res = await fetch(`${API_URL}/graphql`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-API-KEY": API_KEY! },
+    body: JSON.stringify({ query: MUNICIPALITIES_QUERY }),
+  });
+  if (!res.ok) {
+    throw new Error(`Request failed fetching municipalities: ${res.status} ${res.statusText}`);
+  }
+  const json = await res.json();
+  if (json.errors) {
+    throw new Error(`GraphQL error fetching municipalities: ${JSON.stringify(json.errors)}`);
+  }
+  return json.data.municipalities.map((m: { municipalityCode: string; name: string }) => ({
+    code: m.municipalityCode,
+    name: m.name,
+  }));
+}
+
+function municipalityYearCountsQuery(code: string, firstYear: number, lastYear: number): string {
+  const fields: string[] = [];
+  for (let year = firstYear; year <= lastYear; year++) {
+    fields.push(
+      `y${year}: pagedDecisions(skip: 0, take: 1, where: { municipalityCode: { eq: "${code}" }, dateOfFiling: { gte: "${year}-01-01T00:00:00Z", lt: "${year + 1}-01-01T00:00:00Z" } }) { totalCount }`
+    );
+  }
+  return `query MunicipalityYearCounts { ${fields.join("\n    ")} }`;
+}
+
+async function fetchCaseCountsForMunicipality(
+  code: string,
+  firstYear: number,
+  lastYear: number,
+  attempt = 1
+): Promise<Record<string, number>> {
+  const res = await fetch(`${API_URL}/graphql`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-API-KEY": API_KEY! },
+    body: JSON.stringify({ query: municipalityYearCountsQuery(code, firstYear, lastYear) }),
+  });
+
+  if (!res.ok) {
+    if (attempt < 3) {
+      await sleep(1000 * attempt);
+      return fetchCaseCountsForMunicipality(code, firstYear, lastYear, attempt + 1);
+    }
+    throw new Error(`Request failed fetching year counts for municipality ${code}: ${res.status} ${res.statusText}`);
+  }
+
+  const json = await res.json();
+  if (json.errors) {
+    if (attempt < 3) {
+      await sleep(1000 * attempt);
+      return fetchCaseCountsForMunicipality(code, firstYear, lastYear, attempt + 1);
+    }
+    throw new Error(`GraphQL error fetching year counts for municipality ${code}: ${JSON.stringify(json.errors)}`);
+  }
+  const counts: Record<string, number> = {};
+  for (let year = firstYear; year <= lastYear; year++) {
+    counts[year] = json.data[`y${year}`].totalCount;
+  }
+  return counts;
+}
+
+type MunicipalityYearCoverage = Record<string, { name: string; counts: Record<string, number> }>;
+
+async function fetchMunicipalityYearCounts(
+  firstYear: number,
+  lastYear: number
+): Promise<MunicipalityYearCoverage> {
+  const municipalities = await fetchAllMunicipalities();
+  const coverage: MunicipalityYearCoverage = {};
+  for (const m of municipalities) {
+    coverage[m.code] = {
+      name: m.name,
+      counts: await fetchCaseCountsForMunicipality(m.code, firstYear, lastYear),
+    };
+    await sleep(DELAY_MS);
+  }
+  return coverage;
+}
+
 async function fetchPage(skip: number, attempt = 1): Promise<{ totalCount: number; items: DecisionRow[] }> {
   const res = await fetch(`${API_URL}/graphql`, {
     method: "POST",
@@ -324,6 +419,12 @@ async function main() {
     `INSERT INTO sync_meta (key, value) VALUES ('reason_for_closing_counts', @value)
      ON CONFLICT(key) DO UPDATE SET value = @value`
   ).run({ value: JSON.stringify(reasonForClosingCounts) });
+
+  const municipalityYearCounts = await fetchMunicipalityYearCounts(Math.max(firstYear, 2012), lastYear);
+  db.prepare(
+    `INSERT INTO sync_meta (key, value) VALUES ('municipality_year_counts', @value)
+     ON CONFLICT(key) DO UPDATE SET value = @value`
+  ).run({ value: JSON.stringify(municipalityYearCounts) });
 
   let skip = 0;
   let totalCount = Infinity;

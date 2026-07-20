@@ -510,3 +510,25 @@ export function getReasonForClosingByQuarter(): ReasonForClosingByQuarter[] {
     return [];
   }
 }
+
+export type MunicipalityYearCoverage = {
+  code: string;
+  name: string;
+  countsByYear: Record<string, number>;
+};
+
+// From the API's canonical municipality list (not the local decisions
+// table), so a municipality with zero cases ever still shows up as missing
+// every year rather than being silently absent — set by scripts/sync.ts.
+export function getMunicipalityYearCoverage(): MunicipalityYearCoverage[] {
+  const value = getSyncMeta("municipality_year_counts");
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as Record<string, { name: string; counts: Record<string, number> }>;
+    return Object.entries(parsed)
+      .map(([code, { name, counts }]) => ({ code, name, countsByYear: counts }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    return [];
+  }
+}

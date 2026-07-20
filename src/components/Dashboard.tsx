@@ -77,6 +77,15 @@ export async function Dashboard({
     </Link>
   );
 
+  const CoverageLink = (
+    <Link
+      href={locale === "en" ? "/coverage" : "/coverage/da"}
+      className="text-sm text-[var(--link)] underline hover:text-[var(--text-primary)]"
+    >
+      {t.coverageNavLink}
+    </Link>
+  );
+
   const UtilityBar = (
     <div className="border-b border-[var(--border)] bg-[var(--surface-1)]">
       <div className="mx-auto w-full max-w-4xl px-6 py-2 text-xs text-[var(--text-muted)]">
@@ -161,6 +170,7 @@ export async function Dashboard({
           </div>
           <div className="flex items-center gap-4">
             {StatutesLink}
+            {CoverageLink}
             {LanguageSwitcher}
           </div>
         </header>

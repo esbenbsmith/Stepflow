@@ -74,6 +74,14 @@ export interface Dictionary {
   decisionStatusHeading: string;
   decisionStatusLabel: string;
   allCasesVsFilteredNote: string;
+  coverageNavLink: string;
+  coveragePageTitle: string;
+  coveragePageSubtitle: string;
+  coverageYearColumn: string;
+  coverageMissingCountColumn: string;
+  coverageMissingMunicipalitiesColumn: string;
+  coverageNoneMissing: string;
+  coverageCurrentYearNote: string;
 }
 
 const dictionaries: Record<Locale, Dictionary> = {
@@ -168,6 +176,16 @@ const dictionaries: Record<Locale, Dictionary> = {
     decisionStatusLabel: "Status",
     allCasesVsFilteredNote:
       "This covers every case in the source system. \"Decisions counted\" below uses a smaller, filtered subset of these — see the note near the bottom for what's excluded and why.",
+    coverageNavLink: "Data coverage",
+    coveragePageTitle: "Data coverage",
+    coveragePageSubtitle:
+      "Which municipalities have zero recorded cases in a given year since 2012 — every case regardless of status, not just the filtered set used elsewhere.",
+    coverageYearColumn: "Year",
+    coverageMissingCountColumn: "Municipalities missing",
+    coverageMissingMunicipalitiesColumn: "Which municipalities",
+    coverageNoneMissing: "None — every municipality recorded at least one case.",
+    coverageCurrentYearNote:
+      "The current year is still accumulating cases, so its \"missing\" count reflects incomplete data, not necessarily a real gap.",
   },
   da: {
     locale: "da-DK",
@@ -260,6 +278,16 @@ const dictionaries: Record<Locale, Dictionary> = {
     decisionStatusLabel: "Status",
     allCasesVsFilteredNote:
       "Dette dækker alle sager i kildesystemet. \"Afgørelser talt med\" nedenfor bruger en mindre, filtreret delmængde af disse — se noten nederst for, hvad der er udeladt, og hvorfor.",
+    coverageNavLink: "Datadækning",
+    coveragePageTitle: "Datadækning",
+    coveragePageSubtitle:
+      "Hvilke kommuner har nul registrerede sager i et givet år siden 2012 — alle sager uanset status, ikke kun den filtrerede mængde brugt andre steder.",
+    coverageYearColumn: "År",
+    coverageMissingCountColumn: "Kommuner der mangler",
+    coverageMissingMunicipalitiesColumn: "Hvilke kommuner",
+    coverageNoneMissing: "Ingen — alle kommuner havde mindst én sag.",
+    coverageCurrentYearNote:
+      "Det indeværende år modtager stadig sager, så dets \"mangler\"-tal afspejler ufuldstændige data, ikke nødvendigvis et reelt hul.",
   },
 };
 
