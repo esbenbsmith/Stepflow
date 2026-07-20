@@ -77,9 +77,7 @@ export interface Dictionary {
   coverageNavLink: string;
   coveragePageTitle: string;
   coveragePageSubtitle: string;
-  coverageYearColumn: string;
-  coverageMissingCountColumn: string;
-  coverageMissingMunicipalitiesColumn: string;
+  coverageMissingLabel: string;
   coverageNoneMissing: string;
   coverageCurrentYearNote: string;
 }
@@ -180,9 +178,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     coveragePageTitle: "Data coverage",
     coveragePageSubtitle:
       "Which municipalities have zero recorded cases in a given year since 2012 — every case regardless of status, not just the filtered set used elsewhere.",
-    coverageYearColumn: "Year",
-    coverageMissingCountColumn: "Municipalities missing",
-    coverageMissingMunicipalitiesColumn: "Which municipalities",
+    coverageMissingLabel: "missing",
     coverageNoneMissing: "None — every municipality recorded at least one case.",
     coverageCurrentYearNote:
       "The current year is still accumulating cases, so its \"missing\" count reflects incomplete data, not necessarily a real gap.",
@@ -282,9 +278,7 @@ const dictionaries: Record<Locale, Dictionary> = {
     coveragePageTitle: "Datadækning",
     coveragePageSubtitle:
       "Hvilke kommuner har nul registrerede sager i et givet år siden 2012 — alle sager uanset status, ikke kun den filtrerede mængde brugt andre steder.",
-    coverageYearColumn: "År",
-    coverageMissingCountColumn: "Kommuner der mangler",
-    coverageMissingMunicipalitiesColumn: "Hvilke kommuner",
+    coverageMissingLabel: "mangler",
     coverageNoneMissing: "Ingen — alle kommuner havde mindst én sag.",
     coverageCurrentYearNote:
       "Det indeværende år modtager stadig sager, så dets \"mangler\"-tal afspejler ufuldstændige data, ikke nødvendigvis et reelt hul.",

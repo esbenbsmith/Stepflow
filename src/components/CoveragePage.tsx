@@ -75,36 +75,31 @@ export async function CoveragePage({ locale }: { locale: Locale }) {
         {rows.length === 0 ? (
           <p className="text-sm text-[var(--text-secondary)]">{t.noMatch}</p>
         ) : (
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-1)]">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-left text-xs text-[var(--text-muted)]">
-                  <th className="px-3 py-2 font-medium">{t.coverageYearColumn}</th>
-                  <th className="px-3 py-2 font-medium text-right">{t.coverageMissingCountColumn}</th>
-                  <th className="px-3 py-2 font-medium">{t.coverageMissingMunicipalitiesColumn}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.year} className="border-b border-[var(--border)] last:border-0 align-top">
-                    <td className="px-3 py-1.5 whitespace-nowrap text-[var(--text-primary)]">
-                      {row.year}
-                      {row.year === currentYear && (
-                        <span className="ml-1 text-[var(--text-muted)]">*</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-1.5 text-right tabular-nums text-[var(--text-primary)]">
-                      {row.missing.length}
-                    </td>
-                    <td className="px-3 py-1.5 text-[var(--text-secondary)]">
-                      {row.missing.length === 0
-                        ? t.coverageNoneMissing
-                        : row.missing.map((m) => m.name).join(", ")}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="divide-y divide-[var(--border)] rounded-lg border border-[var(--border)] bg-[var(--surface-1)]">
+            {rows.map((row) => (
+              <details key={row.year} className="px-4 py-3">
+                <summary className="flex cursor-pointer items-center justify-between text-sm text-[var(--text-primary)]">
+                  <span>
+                    {row.year}
+                    {row.year === currentYear && (
+                      <span className="ml-1 text-[var(--text-muted)]">*</span>
+                    )}
+                  </span>
+                  <span className="text-xs tabular-nums text-[var(--text-muted)]">
+                    {row.missing.length} {t.coverageMissingLabel}
+                  </span>
+                </summary>
+                {row.missing.length === 0 ? (
+                  <p className="mt-2 text-xs text-[var(--text-secondary)]">{t.coverageNoneMissing}</p>
+                ) : (
+                  <ul className="mt-2 list-disc space-y-0.5 pl-5 text-xs text-[var(--text-secondary)]">
+                    {row.missing.map((m) => (
+                      <li key={m.code}>{m.name}</li>
+                    ))}
+                  </ul>
+                )}
+              </details>
+            ))}
           </div>
         )}
 
