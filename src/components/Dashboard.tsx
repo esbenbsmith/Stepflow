@@ -9,6 +9,7 @@ import {
   getMunicipalityOptions,
   getOverall,
   getReasonForClosingByQuarter,
+  getReasonForClosingByQuarterDecision,
   getReasonForClosingByYear,
   getReasonForClosingCounts,
   getSyncMeta,
@@ -118,6 +119,7 @@ export async function Dashboard({
   const totalCaseCount = getTotalCaseCount();
   const reasonForClosingByYear = getReasonForClosingByYear();
   const reasonForClosingByQuarter = getReasonForClosingByQuarter();
+  const reasonForClosingByQuarterDecision = getReasonForClosingByQuarterDecision();
   const reasonForClosingBreakdown = Object.entries(getReasonForClosingCounts())
     .filter(([, count]) => count > 0)
     .sort(([, a], [, b]) => b - a)
@@ -237,7 +239,11 @@ export async function Dashboard({
 
         {reasonForClosingByQuarter.length > 0 && (
           <div className="mt-8">
-            <QuarterlyStatusTable data={reasonForClosingByQuarter} t={t} />
+            <QuarterlyStatusTable
+              dataByFiling={reasonForClosingByQuarter}
+              dataByDecision={reasonForClosingByQuarterDecision}
+              t={t}
+            />
           </div>
         )}
 

@@ -147,15 +147,47 @@ async function fetchFilingYearRange(): Promise<{ firstYear: number; lastYear: nu
   return { firstYear, lastYear };
 }
 
-function reasonForClosingRangeQuery(gte: string, lt: string): string {
+const DECISION_YEAR_RANGE_QUERY = `
+  query DecisionYearRange {
+    oldest: pagedDecisions(skip: 0, take: 1, order: { dateOfDecision: ASC }, where: { dateOfDecision: { neq: null } }) {
+      items { dateOfDecision }
+    }
+    newest: pagedDecisions(skip: 0, take: 1, order: { dateOfDecision: DESC }, where: { dateOfDecision: { neq: null } }) {
+      items { dateOfDecision }
+    }
+  }
+`;
+
+async function fetchDecisionYearRange(): Promise<{ firstYear: number; lastYear: number }> {
+  const res = await fetch(`${API_URL}/graphql`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-API-KEY": API_KEY! },
+    body: JSON.stringify({ query: DECISION_YEAR_RANGE_QUERY }),
+  });
+  if (!res.ok) {
+    throw new Error(`Request failed fetching decision year range: ${res.status} ${res.statusText}`);
+  }
+  const json = await res.json();
+  if (json.errors) {
+    throw new Error(`GraphQL error fetching decision year range: ${JSON.stringify(json.errors)}`);
+  }
+  const firstYear = new Date(json.data.oldest.items[0].dateOfDecision).getUTCFullYear();
+  const lastYear = new Date(json.data.newest.items[0].dateOfDecision).getUTCFullYear();
+  return { firstYear, lastYear };
+}
+
+type DateDimension = "dateOfFiling" | "dateOfDecision";
+
+function reasonForClosingRangeQuery(dateField: DateDimension, gte: string, lt: string): string {
   const fields = REASON_FOR_CLOSING_VALUES.map(
     (v) =>
-      `${v}: pagedDecisions(skip: 0, take: 1, where: { dateOfFiling: { gte: "${gte}", lt: "${lt}" }, reasonForClosing: { eq: ${v} } }) { totalCount }`
+      `${v}: pagedDecisions(skip: 0, take: 1, where: { ${dateField}: { gte: "${gte}", lt: "${lt}" }, reasonForClosing: { eq: ${v} } }) { totalCount }`
   ).join("\n    ");
   return `query ReasonForClosingForRange { ${fields} }`;
 }
 
 async function fetchReasonForClosingForRange(
+  dateField: DateDimension,
   gte: string,
   lt: string,
   label: string,
@@ -164,13 +196,13 @@ async function fetchReasonForClosingForRange(
   const res = await fetch(`${API_URL}/graphql`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-API-KEY": API_KEY! },
-    body: JSON.stringify({ query: reasonForClosingRangeQuery(gte, lt) }),
+    body: JSON.stringify({ query: reasonForClosingRangeQuery(dateField, gte, lt) }),
   });
 
   if (!res.ok) {
     if (attempt < 3) {
       await sleep(1000 * attempt);
-      return fetchReasonForClosingForRange(gte, lt, label, attempt + 1);
+      return fetchReasonForClosingForRange(dateField, gte, lt, label, attempt + 1);
     }
     throw new Error(`Request failed fetching reason-for-closing counts for ${label}: ${res.status} ${res.statusText}`);
   }
@@ -179,7 +211,7 @@ async function fetchReasonForClosingForRange(
   if (json.errors) {
     if (attempt < 3) {
       await sleep(1000 * attempt);
-      return fetchReasonForClosingForRange(gte, lt, label, attempt + 1);
+      return fetchReasonForClosingForRange(dateField, gte, lt, label, attempt + 1);
     }
     throw new Error(`GraphQL error fetching reason-for-closing counts for ${label}: ${JSON.stringify(json.errors)}`);
   }
@@ -197,6 +229,7 @@ async function fetchReasonForClosingByYear(
   const byYear: Record<string, Record<string, number>> = {};
   for (let year = firstYear; year <= lastYear; year++) {
     byYear[year] = await fetchReasonForClosingForRange(
+      "dateOfFiling",
       `${year}-01-01T00:00:00Z`,
       `${year + 1}-01-01T00:00:00Z`,
       String(year)
@@ -207,6 +240,7 @@ async function fetchReasonForClosingByYear(
 }
 
 async function fetchReasonForClosingByQuarter(
+  dateField: DateDimension,
   firstYear: number,
   lastYear: number
 ): Promise<Record<string, Record<string, number>>> {
@@ -218,6 +252,7 @@ async function fetchReasonForClosingByQuarter(
       const endYear = startMonth + 3 > 12 ? year + 1 : year;
       const key = `${year}-Q${quarter}`;
       byQuarter[key] = await fetchReasonForClosingForRange(
+        dateField,
         `${year}-${String(startMonth).padStart(2, "0")}-01T00:00:00Z`,
         `${endYear}-${String(endMonth).padStart(2, "0")}-01T00:00:00Z`,
         key
@@ -403,11 +438,22 @@ async function main() {
      ON CONFLICT(key) DO UPDATE SET value = @value`
   ).run({ value: JSON.stringify(reasonForClosingByYear) });
 
-  const reasonForClosingByQuarter = await fetchReasonForClosingByQuarter(firstYear, lastYear);
+  const reasonForClosingByQuarter = await fetchReasonForClosingByQuarter("dateOfFiling", firstYear, lastYear);
   db.prepare(
     `INSERT INTO sync_meta (key, value) VALUES ('reason_for_closing_by_quarter', @value)
      ON CONFLICT(key) DO UPDATE SET value = @value`
   ).run({ value: JSON.stringify(reasonForClosingByQuarter) });
+
+  const decisionYearRange = await fetchDecisionYearRange();
+  const reasonForClosingByQuarterDecision = await fetchReasonForClosingByQuarter(
+    "dateOfDecision",
+    decisionYearRange.firstYear,
+    decisionYearRange.lastYear
+  );
+  db.prepare(
+    `INSERT INTO sync_meta (key, value) VALUES ('reason_for_closing_by_quarter_decision', @value)
+     ON CONFLICT(key) DO UPDATE SET value = @value`
+  ).run({ value: JSON.stringify(reasonForClosingByQuarterDecision) });
 
   const reasonForClosingCounts: Record<string, number> = {};
   for (const yearCounts of Object.values(reasonForClosingByYear)) {

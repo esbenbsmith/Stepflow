@@ -487,10 +487,7 @@ export function getReasonForClosingByYear(): ReasonForClosingByYear[] {
 
 export type ReasonForClosingByQuarter = { year: string; quarter: number; period: string } & ReasonForClosingCounts;
 
-// Same as getReasonForClosingByYear, bucketed by quarter of filing instead
-// (keys stored as "2023-Q1" etc.) — set by scripts/sync.ts.
-export function getReasonForClosingByQuarter(): ReasonForClosingByQuarter[] {
-  const value = getSyncMeta("reason_for_closing_by_quarter");
+function parseReasonForClosingByQuarter(value: string | null): ReasonForClosingByQuarter[] {
   if (!value) return [];
   try {
     const parsed = JSON.parse(value) as Record<string, Partial<ReasonForClosingCounts>>;
@@ -509,6 +506,21 @@ export function getReasonForClosingByQuarter(): ReasonForClosingByQuarter[] {
   } catch {
     return [];
   }
+}
+
+// Bucketed by quarter of filing (keys stored as "2023-Q1" etc.) — set by
+// scripts/sync.ts.
+export function getReasonForClosingByQuarter(): ReasonForClosingByQuarter[] {
+  return parseReasonForClosingByQuarter(getSyncMeta("reason_for_closing_by_quarter"));
+}
+
+// Same shape as getReasonForClosingByQuarter, but bucketed by quarter of
+// dateOfDecision instead — set by scripts/sync.ts. Dismissed and not-set
+// cases almost never have a dateOfDecision (that's exactly why the
+// filing-date version exists), so those two columns read close to zero in
+// every quarter here.
+export function getReasonForClosingByQuarterDecision(): ReasonForClosingByQuarter[] {
+  return parseReasonForClosingByQuarter(getSyncMeta("reason_for_closing_by_quarter_decision"));
 }
 
 export type MunicipalityYearCoverage = {
