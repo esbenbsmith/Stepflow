@@ -19,7 +19,8 @@ export function getDb(): Database.Database {
       date_of_decision TEXT NOT NULL,
       decisive_board TEXT NOT NULL DEFAULT '',
       in_favour TEXT NOT NULL DEFAULT '',
-      reason_for_closing TEXT NOT NULL DEFAULT ''
+      reason_for_closing TEXT NOT NULL DEFAULT '',
+      date_of_dismissal TEXT NOT NULL DEFAULT ''
     );
     CREATE INDEX IF NOT EXISTS idx_decisions_municipality ON decisions (municipality_code);
     CREATE INDEX IF NOT EXISTS idx_decisions_decision_year ON decisions (date_of_decision);
@@ -56,6 +57,9 @@ export function getDb(): Database.Database {
   if (!columns.some((c) => c.name === "reason_for_closing")) {
     db.exec("ALTER TABLE decisions ADD COLUMN reason_for_closing TEXT NOT NULL DEFAULT ''");
   }
+  if (!columns.some((c) => c.name === "date_of_dismissal")) {
+    db.exec("ALTER TABLE decisions ADD COLUMN date_of_dismissal TEXT NOT NULL DEFAULT ''");
+  }
 
   return db;
 }
@@ -68,31 +72,42 @@ export type Filters = {
   excludeSectionIds?: string[];
 };
 
-// A handful of decisions carry a dateOfFiling that postdates dateOfDecision.
-// There's no single explanation: the affected rows span 10+ municipalities
-// (Copenhagen and Aarhus have more of them than Skive Kommune, despite an
-// earlier version of this comment blaming a Skive-specific import batch),
-// and the gap ranges from under a day to over a decade. About a quarter of
-// them do share a real fingerprint — dateOfFiling stamped with the exact
-// system-clock time of a recent write (Skive-heavy, but not exclusive to it,
-// and evidently still ongoing rather than a one-off historical batch) — while
-// dateOfDecision stays a clean date. The rest show no such pattern. The API's
-// effectiveDate field can't help disambiguate: it was checked and always
-// mirrors dateOfDecision exactly, so it carries no independent signal.
+// A case's "closing date" is its dateOfDecision if it has one, otherwise its
+// dateOfDismissal — dismissed cases never get a dateOfDecision, but 95% of
+// them do have a dateOfDismissal (nothing else in this codebase used that
+// field until dismissed cases were folded into these statistics). The two
+// are mutually exclusive in practice (a case has at most one), so this is
+// never really picking between two real values, just filling in whichever
+// one a given row actually has.
+const CLOSING_DATE_EXPR = "COALESCE(NULLIF(date_of_decision, ''), NULLIF(date_of_dismissal, ''))";
+
+// A handful of decisions carry a dateOfFiling that postdates their closing
+// date. There's no single explanation: the affected rows span 10+
+// municipalities (Copenhagen and Aarhus have more of them than Skive
+// Kommune, despite an earlier version of this comment blaming a
+// Skive-specific import batch), and the gap ranges from under a day to over
+// a decade — a sampled dismissal even had a -3,565 day gap, the worst seen
+// in either date field. About a quarter of the dateOfDecision cases do share
+// a real fingerprint — dateOfFiling stamped with the exact system-clock time
+// of a recent write (Skive-heavy, but not exclusive to it, and evidently
+// still ongoing rather than a one-off historical batch) — while dateOfDecision
+// stays a clean date. The rest show no such pattern. The API's effectiveDate
+// field can't help disambiguate: it was checked and always mirrors
+// dateOfDecision exactly, so it carries no independent signal.
 //
-// A case can't be decided before it's filed, so rows more than a day off are
+// A case can't be closed before it's filed, so rows more than a day off are
 // excluded from every statistic rather than silently skewing them (see
 // getExclusionBreakdown for a visible, per-reason tally). Rows within a day
 // are tolerated as same-day noise and clamped to 0 duration instead —
 // plausibly just a timezone/rounding artifact rather than bad data.
-const VALID_DURATION = "julianday(date_of_decision) >= julianday(date_of_filing) - 1";
+const VALID_DURATION = `julianday(${CLOSING_DATE_EXPR}) >= julianday(date_of_filing) - 1`;
 
-// Filed or decided before 2012 — that period has very sparse volume (a
+// Filed or closed before 2012 — that period has very sparse volume (a
 // handful of cases a year, versus thousands per year from 2012 on) and is
 // treated as outside the statistically meaningful range.
-const NOT_BEFORE_2012 = "strftime('%Y', date_of_filing) >= '2012' AND strftime('%Y', date_of_decision) >= '2012'";
+const NOT_BEFORE_2012 = `strftime('%Y', date_of_filing) >= '2012' AND strftime('%Y', ${CLOSING_DATE_EXPR}) >= '2012'`;
 
-const DURATION_EXPR = "MAX(0, julianday(date_of_decision) - julianday(date_of_filing))";
+const DURATION_EXPR = `MAX(0, julianday(${CLOSING_DATE_EXPR}) - julianday(date_of_filing))`;
 
 function sectionIdPlaceholders(prefix: string, ids: string[], params: Record<string, string>): string {
   return ids
@@ -109,7 +124,7 @@ function userConditions(filters: Filters): { conditions: string[]; params: Recor
   const params: Record<string, string> = {};
 
   if (filters.year) {
-    conditions.push("strftime('%Y', date_of_decision) = @year");
+    conditions.push(`strftime('%Y', ${CLOSING_DATE_EXPR}) = @year`);
     params.year = filters.year;
   }
   if (filters.municipalityCode) {
@@ -183,7 +198,7 @@ export function getYearlyAverages(filters: Omit<Filters, "year"> = {}): YearlyAv
     .prepare(
       `
       SELECT
-        strftime('%Y', date_of_decision) AS year,
+        strftime('%Y', ${CLOSING_DATE_EXPR}) AS year,
         AVG(${DURATION_EXPR}) AS avgDays,
         COUNT(*) AS caseCount
       FROM decisions
@@ -244,7 +259,7 @@ export function getInFavourByYear(filters: Omit<Filters, "year"> = {}): InFavour
     .prepare(
       `
       SELECT
-        strftime('%Y', date_of_decision) AS year,
+        strftime('%Y', ${CLOSING_DATE_EXPR}) AS year,
         ${IN_FAVOUR_COUNTS_SELECT}
       FROM decisions
       ${sql}
@@ -323,9 +338,9 @@ export function getYearOptions(): string[] {
   const rows = getDb()
     .prepare(
       `
-      SELECT DISTINCT strftime('%Y', date_of_decision) AS year
+      SELECT DISTINCT strftime('%Y', ${CLOSING_DATE_EXPR}) AS year
       FROM decisions
-      WHERE date_of_decision IS NOT NULL
+      WHERE ${CLOSING_DATE_EXPR} IS NOT NULL
       ORDER BY year DESC
       `
     )
@@ -348,7 +363,7 @@ export function getDecisiveBoardOptions(): string[] {
 }
 
 // Rows failing VALID_DURATION by more than the 1-day tolerance.
-const INVALID_DURATION = "julianday(date_of_decision) < julianday(date_of_filing) - 1";
+const INVALID_DURATION = `julianday(${CLOSING_DATE_EXPR}) < julianday(date_of_filing) - 1`;
 
 export type ExclusionBreakdown = {
   invalidDuration: number;

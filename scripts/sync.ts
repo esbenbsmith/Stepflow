@@ -32,20 +32,25 @@ type DecisionRow = {
   municipalityCode: string;
   municipalityName: string;
   dateOfFiling: string;
-  dateOfDecision: string;
+  dateOfDecision: string | null;
+  dateOfDismissal: string | null;
   decisiveBoard: string;
   inFavour: string;
   reasonForClosing: string;
   statutories: Statutory[];
 };
 
+// Dismissed cases never have a dateOfDecision, but 95% of them have a
+// dateOfDismissal instead — pulling in either lets dismissed cases get a
+// real closing date for duration purposes (see CLOSING_DATE_EXPR in
+// src/lib/db.ts). Confirmed the API's where DSL supports a top-level "or".
 const QUERY = `
   query Sync($skip: Int!, $take: Int!) {
     pagedDecisions(
       skip: $skip
       take: $take
       order: { id: ASC }
-      where: { dateOfFiling: { neq: null }, dateOfDecision: { neq: null } }
+      where: { dateOfFiling: { neq: null }, or: [{ dateOfDecision: { neq: null } }, { dateOfDismissal: { neq: null } }] }
     ) {
       totalCount
       items {
@@ -54,6 +59,7 @@ const QUERY = `
         municipalityName
         dateOfFiling
         dateOfDecision
+        dateOfDismissal
         decisiveBoard
         inFavour
         reasonForClosing
@@ -178,11 +184,17 @@ async function fetchDecisionYearRange(): Promise<{ firstYear: number; lastYear: 
 
 type DateDimension = "dateOfFiling" | "dateOfDecision";
 
+// Dismissed cases never have a dateOfDecision, so bucketing by decision date
+// would otherwise always read 0 for them — fall back to dateOfDismissal in
+// that case (harmless for the other five values, which never have one).
 function reasonForClosingRangeQuery(dateField: DateDimension, gte: string, lt: string): string {
-  const fields = REASON_FOR_CLOSING_VALUES.map(
-    (v) =>
-      `${v}: pagedDecisions(skip: 0, take: 1, where: { ${dateField}: { gte: "${gte}", lt: "${lt}" }, reasonForClosing: { eq: ${v} } }) { totalCount }`
-  ).join("\n    ");
+  const fields = REASON_FOR_CLOSING_VALUES.map((v) => {
+    const dateFilter =
+      dateField === "dateOfDecision"
+        ? `or: [{ dateOfDecision: { gte: "${gte}", lt: "${lt}" } }, { dateOfDismissal: { gte: "${gte}", lt: "${lt}" } }]`
+        : `${dateField}: { gte: "${gte}", lt: "${lt}" }`;
+    return `${v}: pagedDecisions(skip: 0, take: 1, where: { ${dateFilter}, reasonForClosing: { eq: ${v} } }) { totalCount }`;
+  }).join("\n    ");
   return `query ReasonForClosingForRange { ${fields} }`;
 }
 
@@ -391,8 +403,8 @@ function sleep(ms: number) {
 async function main() {
   const db = getDb();
   const upsert = db.prepare(`
-    INSERT INTO decisions (id, municipality_code, municipality_name, date_of_filing, date_of_decision, decisive_board, in_favour, reason_for_closing)
-    VALUES (@id, @municipalityCode, @municipalityName, @dateOfFiling, @dateOfDecision, @decisiveBoard, @inFavour, @reasonForClosing)
+    INSERT INTO decisions (id, municipality_code, municipality_name, date_of_filing, date_of_decision, decisive_board, in_favour, reason_for_closing, date_of_dismissal)
+    VALUES (@id, @municipalityCode, @municipalityName, @dateOfFiling, @dateOfDecision, @decisiveBoard, @inFavour, @reasonForClosing, @dateOfDismissal)
     ON CONFLICT(id) DO UPDATE SET
       municipality_code = excluded.municipality_code,
       municipality_name = excluded.municipality_name,
@@ -400,7 +412,8 @@ async function main() {
       date_of_decision = excluded.date_of_decision,
       decisive_board = excluded.decisive_board,
       in_favour = excluded.in_favour,
-      reason_for_closing = excluded.reason_for_closing
+      reason_for_closing = excluded.reason_for_closing,
+      date_of_dismissal = excluded.date_of_dismissal
   `);
   const deleteStatutories = db.prepare(`DELETE FROM decision_statutories WHERE decision_id = @decisionId`);
   const insertStatutory = db.prepare(`
@@ -409,7 +422,11 @@ async function main() {
   `);
   const upsertMany = db.transaction((rows: DecisionRow[]) => {
     for (const row of rows) {
-      upsert.run(row);
+      upsert.run({
+        ...row,
+        dateOfDecision: row.dateOfDecision ?? "",
+        dateOfDismissal: row.dateOfDismissal ?? "",
+      });
       deleteStatutories.run({ decisionId: row.id });
       for (const s of row.statutories) {
         insertStatutory.run({
