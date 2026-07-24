@@ -469,11 +469,7 @@ export function getReasonForClosingCounts(): ReasonForClosingCounts {
 
 export type ReasonForClosingByYear = { year: string } & ReasonForClosingCounts;
 
-// Bucketed by year of filing (not year of decision) — set by scripts/sync.ts.
-// Dismissed/not-set cases have no dateOfDecision, but every case has a
-// dateOfFiling, so filing year is the only year dimension that covers them.
-export function getReasonForClosingByYear(): ReasonForClosingByYear[] {
-  const value = getSyncMeta("reason_for_closing_by_year");
+function parseReasonForClosingByYear(value: string | null): ReasonForClosingByYear[] {
   if (!value) return [];
   try {
     const parsed = JSON.parse(value) as Record<string, Partial<ReasonForClosingCounts>>;
@@ -483,6 +479,21 @@ export function getReasonForClosingByYear(): ReasonForClosingByYear[] {
   } catch {
     return [];
   }
+}
+
+// Bucketed by year of filing — set by scripts/sync.ts. Dismissed/not-set
+// cases have no dateOfDecision, but every case has a dateOfFiling, so filing
+// year is the only year dimension that covers them.
+export function getReasonForClosingByYear(): ReasonForClosingByYear[] {
+  return parseReasonForClosingByYear(getSyncMeta("reason_for_closing_by_year"));
+}
+
+// Same shape as getReasonForClosingByYear, but bucketed by year of
+// dateOfDecision instead — set by scripts/sync.ts. Dismissed and not-set
+// cases almost never have a dateOfDecision, so those two series read close
+// to zero in every year here.
+export function getReasonForClosingByYearDecision(): ReasonForClosingByYear[] {
+  return parseReasonForClosingByYear(getSyncMeta("reason_for_closing_by_year_decision"));
 }
 
 export type ReasonForClosingByQuarter = { year: string; quarter: number; period: string } & ReasonForClosingCounts;

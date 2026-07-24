@@ -11,6 +11,7 @@ import {
   getReasonForClosingByQuarter,
   getReasonForClosingByQuarterDecision,
   getReasonForClosingByYear,
+  getReasonForClosingByYearDecision,
   getReasonForClosingCounts,
   getSyncMeta,
   getTotalCaseCount,
@@ -118,6 +119,7 @@ export async function Dashboard({
   const overall = getOverall(filters);
   const totalCaseCount = getTotalCaseCount();
   const reasonForClosingByYear = getReasonForClosingByYear();
+  const reasonForClosingByYearDecision = getReasonForClosingByYearDecision();
   const reasonForClosingByQuarter = getReasonForClosingByQuarter();
   const reasonForClosingByQuarterDecision = getReasonForClosingByQuarterDecision();
   const reasonForClosingBreakdown = Object.entries(getReasonForClosingCounts())
@@ -233,7 +235,11 @@ export async function Dashboard({
 
         {reasonForClosingByYear.length > 0 && (
           <div className="mt-8">
-            <CaseStatusChart data={reasonForClosingByYear} t={t} />
+            <CaseStatusChart
+              dataByFiling={reasonForClosingByYear}
+              dataByDecision={reasonForClosingByYearDecision}
+              t={t}
+            />
           </div>
         )}
 

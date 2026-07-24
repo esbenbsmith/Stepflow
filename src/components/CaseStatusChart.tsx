@@ -31,6 +31,8 @@ const REASON_COLORS: Record<(typeof REASON_KEYS)[number], string> = {
   NOT_SET: "var(--series-4)",
 };
 
+type DateMode = "filing" | "decision";
+
 function total(row: ReasonForClosingByYear): number {
   return REASON_KEYS.reduce((sum, key) => sum + row[key], 0);
 }
@@ -70,36 +72,71 @@ function TooltipContent({
   );
 }
 
-export function CaseStatusChart({ data, t }: { data: ReasonForClosingByYear[]; t: Dictionary }) {
+export function CaseStatusChart({
+  dataByFiling,
+  dataByDecision,
+  t,
+}: {
+  dataByFiling: ReasonForClosingByYear[];
+  dataByDecision: ReasonForClosingByYear[];
+  t: Dictionary;
+}) {
   const [displayMode, setDisplayMode] = useState<"chart" | "table">("chart");
+  const [dateMode, setDateMode] = useState<DateMode>("filing");
 
+  const data = dateMode === "filing" ? dataByFiling : dataByDecision;
+  const methodLines = dateMode === "filing" ? t.caseStatusMethodLinesFiling : t.caseStatusMethodLinesDecision;
   const legend = REASON_KEYS.map((key) => [t.reasonForClosingLabels[key] ?? key, REASON_COLORS[key]] as const);
 
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-[var(--text-primary)]">{t.caseStatusHeading}</h2>
-        <div className="flex items-center gap-4 text-xs">
-          <button
-            onClick={() => setDisplayMode("chart")}
-            className={`border-b-2 px-1 pb-1 font-medium ${
-              displayMode === "chart"
-                ? "border-[var(--accent)] text-[var(--text-primary)]"
-                : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            {t.chartTab}
-          </button>
-          <button
-            onClick={() => setDisplayMode("table")}
-            className={`border-b-2 px-1 pb-1 font-medium ${
-              displayMode === "table"
-                ? "border-[var(--accent)] text-[var(--text-primary)]"
-                : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            {t.tableTab}
-          </button>
+        <div className="flex flex-wrap items-center gap-4 text-xs">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setDateMode("filing")}
+              className={`border-b-2 px-1 pb-1 font-medium ${
+                dateMode === "filing"
+                  ? "border-[var(--accent)] text-[var(--text-primary)]"
+                  : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              {t.dateModeFilingToggle}
+            </button>
+            <button
+              onClick={() => setDateMode("decision")}
+              className={`border-b-2 px-1 pb-1 font-medium ${
+                dateMode === "decision"
+                  ? "border-[var(--accent)] text-[var(--text-primary)]"
+                  : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              {t.dateModeDecisionToggle}
+            </button>
+          </div>
+          <div className="flex items-center gap-4 border-l border-[var(--border)] pl-4">
+            <button
+              onClick={() => setDisplayMode("chart")}
+              className={`border-b-2 px-1 pb-1 font-medium ${
+                displayMode === "chart"
+                  ? "border-[var(--accent)] text-[var(--text-primary)]"
+                  : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              {t.chartTab}
+            </button>
+            <button
+              onClick={() => setDisplayMode("table")}
+              className={`border-b-2 px-1 pb-1 font-medium ${
+                displayMode === "table"
+                  ? "border-[var(--accent)] text-[var(--text-primary)]"
+                  : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              {t.tableTab}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -178,6 +215,15 @@ export function CaseStatusChart({ data, t }: { data: ReasonForClosingByYear[]; t
           </ResponsiveContainer>
         </div>
       )}
+
+      <details className="mt-3 rounded border-l-4 border-[var(--info-border)] bg-[var(--info-bg)] px-4 py-3 text-sm text-[var(--text-primary)]">
+        <summary className="cursor-pointer">{t.dateModeMethodToggle}</summary>
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-[var(--text-secondary)]">
+          {methodLines.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </details>
     </div>
   );
 }

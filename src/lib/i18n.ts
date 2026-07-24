@@ -69,13 +69,15 @@ export interface Dictionary {
   caseStatusHeading: string;
   caseStatusCountAxis: string;
   caseStatusTableTotal: string;
+  caseStatusMethodLinesFiling: string[];
+  caseStatusMethodLinesDecision: string[];
   quarterlyStatusHeading: string;
   quarterlyStatusQuarter: string;
-  quarterlyStatusFilingToggle: string;
-  quarterlyStatusDecisionToggle: string;
-  quarterlyStatusMethodToggle: string;
   quarterlyStatusMethodLinesFiling: string[];
   quarterlyStatusMethodLinesDecision: string[];
+  dateModeFilingToggle: string;
+  dateModeDecisionToggle: string;
+  dateModeMethodToggle: string;
   decisionStatusHeading: string;
   decisionStatusLabel: string;
   allCasesVsFilteredNote: string;
@@ -174,11 +176,18 @@ const dictionaries: Record<Locale, Dictionary> = {
     caseStatusHeading: "All cases, by year and status",
     caseStatusCountAxis: "Cases",
     caseStatusTableTotal: "Total",
+    caseStatusMethodLinesFiling: [
+      "Bucketed by year of dateOfFiling (filing date), not date of decision — dismissed and not-yet-decided cases never get a dateOfDecision, but every case has a dateOfFiling.",
+      "For each year, queries pagedDecisions with where: { dateOfFiling: { gte, lt } } for that year's date range and reasonForClosing: { eq } for each of the six status values (NOT_SET, DISMISSED, IN_FAVOUR, REJECTED, SETTLEMENT, IN_PARTIAL_FAVOUR), reading each query's totalCount directly rather than counting rows locally.",
+      "Every case has exactly one reasonForClosing value, so this chart covers all cases filed in the source system — not the smaller, filtered subset used by \"Decisions counted\" elsewhere on this page.",
+    ],
+    caseStatusMethodLinesDecision: [
+      "Bucketed by year of dateOfDecision (decision date) instead — same query shape as the filing-date view, but filtering on where: { dateOfDecision: { gte, lt } }.",
+      "Dismissed and not-yet-decided cases almost never have a dateOfDecision at all (that's exactly why the filing-date view exists), so those two series read close to zero in every year here — that's expected, not a data error.",
+      "A small number of cases with an actual outcome (in favour, rejected, settled, partially in favour) also lack a dateOfDecision and so don't appear in any year in this view — unlike the filing-date view, this one does not cover every case in the source system.",
+    ],
     quarterlyStatusHeading: "All cases, by quarter and status",
     quarterlyStatusQuarter: "Quarter",
-    quarterlyStatusFilingToggle: "By filing date",
-    quarterlyStatusDecisionToggle: "By decision date",
-    quarterlyStatusMethodToggle: "How these counts are calculated",
     quarterlyStatusMethodLinesFiling: [
       "Bucketed by quarter of dateOfFiling (filing date), not date of decision — dismissed and not-yet-decided cases never get a dateOfDecision, but every case has a dateOfFiling.",
       "For each quarter, queries pagedDecisions with where: { dateOfFiling: { gte, lt } } for that quarter's date range and reasonForClosing: { eq } for each of the six status values (NOT_SET, DISMISSED, IN_FAVOUR, REJECTED, SETTLEMENT, IN_PARTIAL_FAVOUR), reading each query's totalCount directly rather than counting rows locally.",
@@ -189,6 +198,9 @@ const dictionaries: Record<Locale, Dictionary> = {
       "Dismissed and not-yet-decided cases almost never have a dateOfDecision at all (that's exactly why the filing-date view exists), so those two columns read close to zero in every quarter here — that's expected, not a data error.",
       "A small number of cases with an actual outcome (in favour, rejected, settled, partially in favour) also lack a dateOfDecision and so don't appear in any quarter in this view — unlike the filing-date view, this one does not cover every case in the source system.",
     ],
+    dateModeFilingToggle: "By filing date",
+    dateModeDecisionToggle: "By decision date",
+    dateModeMethodToggle: "How these counts are calculated",
     decisionStatusHeading: "Status of decisions counted",
     decisionStatusLabel: "Status",
     allCasesVsFilteredNote:
@@ -288,21 +300,31 @@ const dictionaries: Record<Locale, Dictionary> = {
     caseStatusHeading: "Alle sager, pr. år og status",
     caseStatusCountAxis: "Sager",
     caseStatusTableTotal: "I alt",
+    caseStatusMethodLinesFiling: [
+      "Opdelt efter år for dateOfFiling (indbringelsesdato), ikke afgørelsesdato — afviste og endnu ikke afgjorte sager får aldrig en dateOfDecision, men alle sager har en dateOfFiling.",
+      "For hvert år forespørges pagedDecisions med where: { dateOfFiling: { gte, lt } } for det pågældende års datointerval og reasonForClosing: { eq } for hver af de seks statusværdier (NOT_SET, DISMISSED, IN_FAVOUR, REJECTED, SETTLEMENT, IN_PARTIAL_FAVOUR), hvor hver forespørgsels totalCount bruges direkte i stedet for at tælle rækker lokalt.",
+      "Hver sag har præcis én reasonForClosing-værdi, så denne graf dækker alle sager indbragt i kildesystemet — ikke den mindre, filtrerede delmængde, som \"Afgørelser talt med\" bruger andetsteds på siden.",
+    ],
+    caseStatusMethodLinesDecision: [
+      "Opdelt efter år for dateOfDecision (afgørelsesdato) i stedet — samme forespørgselsstruktur som indbringelsesdato-visningen, men med where: { dateOfDecision: { gte, lt } }.",
+      "Afviste og endnu ikke afgjorte sager har næsten aldrig en dateOfDecision (det er netop derfor, indbringelsesdato-visningen findes), så disse to serier er tæt på nul i alle år her — det er forventet, ikke en fejl.",
+      "Et lille antal sager med en reel afgørelse mangler også en dateOfDecision og optræder derfor ikke i noget år i denne visning — i modsætning til indbringelsesdato-visningen dækker denne ikke alle sager i kildesystemet.",
+    ],
     quarterlyStatusHeading: "Alle sager, pr. kvartal og status",
     quarterlyStatusQuarter: "Kvartal",
-    quarterlyStatusFilingToggle: "Efter indbringelsesdato",
-    quarterlyStatusDecisionToggle: "Efter afgørelsesdato",
-    quarterlyStatusMethodToggle: "Sådan beregnes disse tal",
     quarterlyStatusMethodLinesFiling: [
       "Opdelt efter kvartal for dateOfFiling (indbringelsesdato), ikke afgørelsesdato — afviste og endnu ikke afgjorte sager får aldrig en dateOfDecision, men alle sager har en dateOfFiling.",
       "For hvert kvartal forespørges pagedDecisions med where: { dateOfFiling: { gte, lt } } for det pågældende kvartals datointerval og reasonForClosing: { eq } for hver af de seks statusværdier (NOT_SET, DISMISSED, IN_FAVOUR, REJECTED, SETTLEMENT, IN_PARTIAL_FAVOUR), hvor hver forespørgsels totalCount bruges direkte i stedet for at tælle rækker lokalt.",
-      "Hver sag har præcis én reasonForClosing-værdi, så denne tabel dækker alle sager indgivet i kildesystemet — ikke den mindre, filtrerede delmængde, som \"Afgørelser talt med\" bruger andetsteds på siden.",
+      "Hver sag har præcis én reasonForClosing-værdi, så denne tabel dækker alle sager indbragt i kildesystemet — ikke den mindre, filtrerede delmængde, som \"Afgørelser talt med\" bruger andetsteds på siden.",
     ],
     quarterlyStatusMethodLinesDecision: [
       "Opdelt efter kvartal for dateOfDecision (afgørelsesdato) i stedet — samme forespørgselsstruktur som indbringelsesdato-visningen, men med where: { dateOfDecision: { gte, lt } }.",
       "Afviste og endnu ikke afgjorte sager har næsten aldrig en dateOfDecision (det er netop derfor, indbringelsesdato-visningen findes), så disse to kolonner er tæt på nul i alle kvartaler her — det er forventet, ikke en fejl.",
       "Et lille antal sager med en reel afgørelse mangler også en dateOfDecision og optræder derfor ikke i noget kvartal i denne visning — i modsætning til indbringelsesdato-visningen dækker denne ikke alle sager i kildesystemet.",
     ],
+    dateModeFilingToggle: "Efter indbringelsesdato",
+    dateModeDecisionToggle: "Efter afgørelsesdato",
+    dateModeMethodToggle: "Sådan beregnes disse tal",
     decisionStatusHeading: "Status for talte afgørelser",
     decisionStatusLabel: "Status",
     allCasesVsFilteredNote:

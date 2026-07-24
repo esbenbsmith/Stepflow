@@ -45,7 +45,7 @@ export function QuarterlyStatusTable({
                 : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             }`}
           >
-            {t.quarterlyStatusFilingToggle}
+            {t.dateModeFilingToggle}
           </button>
           <button
             onClick={() => setMode("decision")}
@@ -55,7 +55,7 @@ export function QuarterlyStatusTable({
                 : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             }`}
           >
-            {t.quarterlyStatusDecisionToggle}
+            {t.dateModeDecisionToggle}
           </button>
         </div>
       </div>
@@ -91,7 +91,7 @@ export function QuarterlyStatusTable({
       </div>
 
       <details className="mt-3 rounded border-l-4 border-[var(--info-border)] bg-[var(--info-bg)] px-4 py-3 text-sm text-[var(--text-primary)]">
-        <summary className="cursor-pointer">{t.quarterlyStatusMethodToggle}</summary>
+        <summary className="cursor-pointer">{t.dateModeMethodToggle}</summary>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-[var(--text-secondary)]">
           {methodLines.map((line) => (
             <li key={line}>{line}</li>

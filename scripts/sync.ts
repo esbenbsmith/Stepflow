@@ -223,13 +223,14 @@ async function fetchReasonForClosingForRange(
 }
 
 async function fetchReasonForClosingByYear(
+  dateField: DateDimension,
   firstYear: number,
   lastYear: number
 ): Promise<Record<string, Record<string, number>>> {
   const byYear: Record<string, Record<string, number>> = {};
   for (let year = firstYear; year <= lastYear; year++) {
     byYear[year] = await fetchReasonForClosingForRange(
-      "dateOfFiling",
+      dateField,
       `${year}-01-01T00:00:00Z`,
       `${year + 1}-01-01T00:00:00Z`,
       String(year)
@@ -432,7 +433,7 @@ async function main() {
 
   const { firstYear, lastYear } = await fetchFilingYearRange();
 
-  const reasonForClosingByYear = await fetchReasonForClosingByYear(firstYear, lastYear);
+  const reasonForClosingByYear = await fetchReasonForClosingByYear("dateOfFiling", firstYear, lastYear);
   db.prepare(
     `INSERT INTO sync_meta (key, value) VALUES ('reason_for_closing_by_year', @value)
      ON CONFLICT(key) DO UPDATE SET value = @value`
@@ -454,6 +455,16 @@ async function main() {
     `INSERT INTO sync_meta (key, value) VALUES ('reason_for_closing_by_quarter_decision', @value)
      ON CONFLICT(key) DO UPDATE SET value = @value`
   ).run({ value: JSON.stringify(reasonForClosingByQuarterDecision) });
+
+  const reasonForClosingByYearDecision = await fetchReasonForClosingByYear(
+    "dateOfDecision",
+    decisionYearRange.firstYear,
+    decisionYearRange.lastYear
+  );
+  db.prepare(
+    `INSERT INTO sync_meta (key, value) VALUES ('reason_for_closing_by_year_decision', @value)
+     ON CONFLICT(key) DO UPDATE SET value = @value`
+  ).run({ value: JSON.stringify(reasonForClosingByYearDecision) });
 
   const reasonForClosingCounts: Record<string, number> = {};
   for (const yearCounts of Object.values(reasonForClosingByYear)) {
